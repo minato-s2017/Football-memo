@@ -1,6 +1,6 @@
 {
-  "name": "Football-Memo",
-  "short_name": "Football-Memo",
+  "name": "W-cup26 Memo",
+  "short_name": "W-cup26 Memo",
   "description": "観戦したサッカーの試合を記録し、フォーメーションを作成できるアプリ",
   "start_url": "./index.html",
   "display": "standalone",

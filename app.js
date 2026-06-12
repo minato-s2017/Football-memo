@@ -1,9 +1,20 @@
 'use strict';
 
-// ===== チームカラー（チーム名から自動決定：同じチームは常に同じ色） =====
+// ===== チームカラー（カスタム色 → 既定色 → チーム名ハッシュ の順で決定） =====
 const TEAM_COLORS = ['#ff5a5f','#ffd23f','#2dc653','#ff7c26','#b5179e','#00d4d4','#7aa0ff','#ff8fab','#9b5de5','#80ed99'];
+// チーム別の既定色（ユーザー未指定のときに使う）。日本は青。
+const DEFAULT_TEAM_COLORS = { '日本': '#1e63e0' };
+const TEAM_COLOR_KEY = 'swm_team_colors';
+// ユーザーが設定したチーム色の上書き { チーム名: '#rrggbb' }
+function teamColorOverrides() {
+  try { const v = JSON.parse(localStorage.getItem(TEAM_COLOR_KEY)); return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {}; } catch { return {}; }
+}
+function saveTeamColorOverrides(o) { localStorage.setItem(TEAM_COLOR_KEY, JSON.stringify(o)); }
 function teamColor(name) {
   if (!name) return '#8a9bc8';
+  const ov = teamColorOverrides();
+  if (ov[name]) return ov[name];
+  if (DEFAULT_TEAM_COLORS[name]) return DEFAULT_TEAM_COLORS[name];
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
   return TEAM_COLORS[h % TEAM_COLORS.length];
@@ -326,6 +337,8 @@ function renderTimeline() {
 
 // ===== 手書きメモ（各イベント・キャンバス描画） =====
 let sketchEventId = null, sketchCtx = null, sketchDrawing = false, sketchLast = null;
+let sketchColor = '#14245e', sketchEraser = false, sketchUndoStack = [];
+const SKETCH_PEN = 6, SKETCH_ERASER = 24;
 function sketchPitchBg() {
   const c = document.getElementById('sketch-canvas'); const ctx = sketchCtx, W = c.width, H = c.height;
   ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
@@ -333,10 +346,29 @@ function sketchPitchBg() {
   const mg = 8;
   ctx.strokeRect(mg, mg, W - 2*mg, H - 2*mg);
   ctx.beginPath(); ctx.moveTo(mg, H/2); ctx.lineTo(W - mg, H/2); ctx.stroke();
-  ctx.beginPath(); ctx.arc(W/2, H/2, 30, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(W/2, H/2, 34, 0, Math.PI*2); ctx.stroke();
   const bw = W*0.5, bh = H*0.12;
   ctx.strokeRect((W-bw)/2, mg, bw, bh);
   ctx.strokeRect((W-bw)/2, H - mg - bh, bw, bh);
+}
+function sketchSetColor(c, btnId) {
+  sketchColor = c; sketchEraser = false;
+  document.querySelectorAll('.sketch-color').forEach(b => b.classList.toggle('active', b.id === btnId));
+  document.getElementById('sketch-eraser').classList.remove('active');
+}
+function sketchToggleEraser() {
+  sketchEraser = !sketchEraser;
+  document.getElementById('sketch-eraser').classList.toggle('active', sketchEraser);
+}
+function sketchPushUndo() {
+  if (!sketchCtx) return;
+  const c = document.getElementById('sketch-canvas');
+  try { sketchUndoStack.push(sketchCtx.getImageData(0, 0, c.width, c.height)); } catch {}
+  if (sketchUndoStack.length > 25) sketchUndoStack.shift();
+}
+function sketchUndo() {
+  if (!sketchCtx || !sketchUndoStack.length) return;
+  sketchCtx.putImageData(sketchUndoStack.pop(), 0, 0);
 }
 function openSketch(eid) {
   const m = DB.matches.find(x => x.id === currentMatchId); if (!m) return;
@@ -344,21 +376,26 @@ function openSketch(eid) {
   sketchEventId = eid;
   const c = document.getElementById('sketch-canvas');
   sketchCtx = c.getContext('2d');
+  sketchColor = '#14245e'; sketchEraser = false; sketchUndoStack = [];
+  document.querySelectorAll('.sketch-color').forEach((b, i) => b.classList.toggle('active', i === 0));
+  document.getElementById('sketch-eraser').classList.remove('active');
   sketchPitchBg();
   if (ev.sketch) { const img = new Image(); img.onload = () => sketchCtx.drawImage(img, 0, 0, c.width, c.height); img.src = ev.sketch; }
   document.getElementById('sketch-modal').classList.remove('hidden');
 }
 function closeSketch() { document.getElementById('sketch-modal').classList.add('hidden'); sketchEventId = null; sketchDrawing = false; }
-function sketchClear() { if (sketchCtx) sketchPitchBg(); }
+function sketchClear() { if (sketchCtx) { sketchPushUndo(); sketchPitchBg(); } }
 function sketchPos(e) {
   const c = document.getElementById('sketch-canvas'); const r = c.getBoundingClientRect();
   return { x: (e.clientX - r.left) * (c.width / r.width), y: (e.clientY - r.top) * (c.height / r.height) };
 }
-function sketchDown(e) { if (!sketchCtx) return; e.preventDefault(); sketchDrawing = true; sketchLast = sketchPos(e); }
+function sketchDown(e) { if (!sketchCtx) return; e.preventDefault(); sketchPushUndo(); sketchDrawing = true; sketchLast = sketchPos(e); }
 function sketchMove(e) {
   if (!sketchDrawing || !sketchCtx) return; e.preventDefault();
   const p = sketchPos(e), ctx = sketchCtx;
-  ctx.strokeStyle = '#14245e'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.strokeStyle = sketchEraser ? '#ffffff' : sketchColor;
+  ctx.lineWidth = sketchEraser ? SKETCH_ERASER : SKETCH_PEN;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   ctx.beginPath(); ctx.moveTo(sketchLast.x, sketchLast.y); ctx.lineTo(p.x, p.y); ctx.stroke();
   sketchLast = p;
 }
@@ -446,6 +483,55 @@ function openHistoryScreen() {
     }).join('');
   }
   showScreen('history');
+}
+
+// ===== チーム名の色を編集（History画面） =====
+function tcTeamsFromMatches() {
+  return [...new Set(DB.matches.flatMap(m => [m.homeTeam, m.awayTeam]).filter(Boolean))].sort();
+}
+function tcListHtml() {
+  const ov = teamColorOverrides();
+  const teams = tcTeamsFromMatches();
+  if (!teams.length) return `<div class="tc-empty">記録に登場するチームがありません。<br>観戦を記録すると、ここで色を変えられます。</div>`;
+  return teams.map(t => {
+    const c = teamColor(t);
+    const badge = ov[t] ? `<span class="tc-badge">変更済</span>` : '';
+    return `<div class="tc-row" data-team="${escHtml(t)}">
+        <span class="tc-dot" style="background:${c}"></span>
+        <span class="tc-name" style="color:${c}">${escHtml(t)}</span>
+        ${badge}
+        <input type="color" class="tc-input" value="${c}" aria-label="${escHtml(t)} の色">
+        <button class="tc-reset" type="button">リセット</button>
+      </div>`;
+  }).join('');
+}
+function openTeamColorEdit() {
+  document.getElementById('tc-list').innerHTML = tcListHtml();
+  document.getElementById('team-color-modal').classList.remove('hidden');
+}
+function closeTeamColorEdit() {
+  document.getElementById('team-color-modal').classList.add('hidden');
+  openHistoryScreen();
+}
+function setTeamColor(team, color) {
+  if (!team) return;
+  const ov = teamColorOverrides();
+  ov[team] = color;
+  saveTeamColorOverrides(ov);
+}
+function clearTeamColor(team) {
+  if (!team) return;
+  const ov = teamColorOverrides();
+  delete ov[team];
+  saveTeamColorOverrides(ov);
+  document.getElementById('tc-list').innerHTML = tcListHtml();
+}
+async function resetAllTeamColors() {
+  const ok = await showDialog('色をリセット', 'すべてのチーム色をデフォルトに戻しますか？');
+  if (!ok) return;
+  localStorage.removeItem(TEAM_COLOR_KEY);
+  document.getElementById('tc-list').innerHTML = tcListHtml();
+  showToast('チーム色をデフォルトに戻しました');
 }
 
 // ===== 観戦の詳細 =====
@@ -787,13 +873,48 @@ function fmCurSlots() {
 }
 function fmSquadOf(team) {
   if (!team) return [];
+  const sq = fmSquadByPos(team);
+  return sq ? [...(sq.GK||[]), ...(sq.DF||[]), ...(sq.MF||[]), ...(sq.FW||[])] : [];
+}
+function fmSquadByPos(team) {
+  if (!team) return null;
   for (const g of TEAMDB.data.groups) {
     const t = g.teams.find(x => x.name === team);
-    if (t && t.squad) return [...(t.squad.GK||[]), ...(t.squad.DF||[]), ...(t.squad.MF||[]), ...(t.squad.FW||[])];
+    if (t && t.squad) return t.squad;
   }
-  return [];
+  return null;
 }
 function fmAssignedNames() { return new Set(Object.values(fmAssign)); }
+
+// チーム選択セレクトを Team タブのチームで埋める（フォルダごとに optgroup）
+function fmPopulateTeamSelect(ensureTeam) {
+  const sel = document.getElementById('fm-team');
+  if (!sel) return;
+  let html = `<option value="">（チームを選択）</option>`;
+  TEAMDB.data.groups.forEach(g => {
+    if (!g.teams.length) return;
+    html += `<optgroup label="グループ ${escHtml(g.id)}">` +
+      g.teams.map(t => `<option value="${escHtml(t.name)}">${escHtml(t.name)}</option>`).join('') + `</optgroup>`;
+  });
+  if (ensureTeam && !TEAMDB.allTeamNames().includes(ensureTeam)) {
+    html += `<optgroup label="その他"><option value="${escHtml(ensureTeam)}">${escHtml(ensureTeam)}</option></optgroup>`;
+  }
+  sel.innerHTML = html;
+}
+
+// 新規作成（画面をリセットして続けて作れるように）
+function fmNewFormation() {
+  fmMatchCtx = null;
+  fmTeam = ''; fmPreset = DEFAULT_PRESET; fmLayout = null; fmAssign = {};
+  fmPopulateTeamSelect();
+  document.getElementById('fm-team').value = '';
+  document.getElementById('fm-preset').value = DEFAULT_PRESET;
+  fmUpdateMatchBanner();
+  fmPersist();
+  renderFormation();
+  renderSavedFormations();
+  showToast('新規作成：チームを選んでください');
+}
 
 function openFormationScreen() {
   TEAMDB.ensureSeed();
@@ -804,6 +925,7 @@ function openFormationScreen() {
     fmTeam = cur.team || ''; fmPreset = cur.preset || DEFAULT_PRESET; fmLayout = cur.layout || null; fmAssign = cur.assignments || {};
   } else { fmTeam = ''; fmPreset = DEFAULT_PRESET; fmLayout = null; fmAssign = {}; }
   refreshDatalists();
+  fmPopulateTeamSelect(fmTeam);
   document.getElementById('fm-team').value = fmTeam;
   document.getElementById('fm-preset').value = fmPreset;
   fmUpdateMatchBanner();
@@ -844,18 +966,23 @@ function renderFormation() {
             </div>`;
   }).join('');
 
-  const squad = fmSquadOf(fmTeam);
+  const sq = fmSquadByPos(fmTeam);
   const benchEl = document.getElementById('fm-bench');
+  const total = sq ? (sq.GK||[]).length + (sq.DF||[]).length + (sq.MF||[]).length + (sq.FW||[]).length : 0;
   if (!fmTeam) {
     benchEl.innerHTML = `<div class="fm-bench-empty">上の「チーム」を選ぶと選手が並びます</div>`;
-  } else if (squad.length === 0) {
+  } else if (total === 0) {
     benchEl.innerHTML = `<div class="fm-bench-empty">「${escHtml(fmTeam)}」の選手が未登録です。Teamタブで登録してください</div>`;
   } else {
     const assigned = fmAssignedNames();
-    const bench = squad.filter(n => !assigned.has(n));
-    benchEl.innerHTML = bench.length
-      ? bench.map(n => `<div class="fm-chip" data-drag="bench" data-name="${escHtml(n)}">${escHtml(n)}</div>`).join('')
-      : `<div class="fm-bench-empty">全員配置済み</div>`;
+    let html = '';
+    ['GK','DF','MF','FW'].forEach(pos => {
+      const list = (sq[pos] || []).filter(n => !assigned.has(n));
+      if (!list.length) return;
+      html += `<div class="fm-bench-pos"><span class="fm-bench-pos-label">${pos}</span>` +
+        list.map(n => `<div class="fm-chip" data-drag="bench" data-name="${escHtml(n)}">${escHtml(n)}</div>`).join('') + `</div>`;
+    });
+    benchEl.innerHTML = html || `<div class="fm-bench-empty">全員配置済み</div>`;
   }
   document.getElementById('fm-custom-hint').style.display = isCustom ? '' : 'none';
 }
@@ -1181,6 +1308,7 @@ function openMatchFormationEdit(matchId, side) {
   fmPreset = L.preset || DEFAULT_PRESET;
   fmLayout = L.layout || null;
   fmAssign = Object.assign({}, L.assignments);
+  fmPopulateTeamSelect(fmTeam);
   document.getElementById('fm-team').value = fmTeam;
   document.getElementById('fm-preset').value = fmPreset;
   fmUpdateMatchBanner();
@@ -1327,7 +1455,7 @@ function renderTeamDetail() {
       <div class="squad-section">
         <div class="squad-section-title">${pos}<span>${list.length}</span></div>
         <div class="squad-chips">${chips}</div>
-        <div class="input-row">
+        <div class="input-row squad-add-row">
           <input id="team-pl-input-${pos}" class="input-field" type="text" placeholder="${pos} に選手を追加" maxlength="30" autocomplete="off" onkeydown="if(event.key==='Enter')teamAddPlayer('${pos}')">
           <button class="btn btn-secondary" onclick="teamAddPlayer('${pos}')">追加</button>
         </div>
@@ -1398,6 +1526,28 @@ document.addEventListener('DOMContentLoaded', () => {
     sc.addEventListener('pointercancel', sketchEnd);
     sc.addEventListener('pointerleave', sketchEnd);
   }
+
+  // チーム色編集：色入力・リセットをイベント委譲で処理（チーム名のエスケープ不要）
+  const tcList = document.getElementById('tc-list');
+  if (tcList) {
+    tcList.addEventListener('input', e => {
+      if (!e.target.classList.contains('tc-input')) return;
+      const row = e.target.closest('.tc-row'); const team = row && row.dataset.team;
+      if (!team) return;
+      setTeamColor(team, e.target.value);
+      const dot = row.querySelector('.tc-dot'); if (dot) dot.style.background = e.target.value;
+      const nm = row.querySelector('.tc-name'); if (nm) nm.style.color = e.target.value;
+      if (nm && !row.querySelector('.tc-badge')) {
+        const b = document.createElement('span'); b.className = 'tc-badge'; b.textContent = '変更済'; nm.after(b);
+      }
+    });
+    tcList.addEventListener('click', e => {
+      if (!e.target.classList.contains('tc-reset')) return;
+      const team = e.target.closest('.tc-row') && e.target.closest('.tc-row').dataset.team;
+      if (team) clearTeamColor(team);
+    });
+  }
+
   refreshDatalists();
 
   if ('serviceWorker' in navigator) {

@@ -8,8 +8,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="Football-Memo">
-  <title>Football-Memo</title>
+  <meta name="apple-mobile-web-app-title" content="W-cup26 Memo">
+  <title>W-cup26 Memo</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2316308f'/%3E%3Ccircle cx='32' cy='32' r='20' fill='white'/%3E%3Cpolygon points='32,23 40.6,29.2 37.3,39.3 26.7,39.3 23.4,29.2' fill='%2316308f'/%3E%3Cg stroke='%2316308f' stroke-width='2.6' stroke-linecap='round'%3E%3Cline x1='32' y1='23' x2='32' y2='13.5'/%3E%3Cline x1='40.6' y1='29.2' x2='49.8' y2='26.2'/%3E%3Cline x1='37.3' y1='39.3' x2='43' y2='47.4'/%3E%3Cline x1='26.7' y1='39.3' x2='21' y2='47.4'/%3E%3Cline x1='23.4' y1='29.2' x2='14.2' y2='26.2'/%3E%3C/g%3E%3C/svg%3E">
   <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
   <link rel="manifest" href="manifest.json">
@@ -22,7 +22,7 @@
   <!-- サイドバー -->
   <nav class="sidebar">
     <div class="sidebar-logo">
-      <div class="sidebar-logo-text">Football-Memo</div>
+      <div class="sidebar-logo-text">W-cup26 Memo</div>
     </div>
     <button class="nav-item active" id="nav-home"      onclick="initHome()">Home</button>
     <button class="nav-item"        id="nav-create"    onclick="openCreateScreen()">Record</button>
@@ -40,7 +40,7 @@
     <div id="screen-home" class="screen active">
       <div class="content">
         <div class="hero">
-          <div class="hero-mark">Football-Memo</div>
+          <div class="hero-mark">W-cup26 Memo</div>
           <div class="hero-tagline">観た試合を、記録する。</div>
         </div>
         <div class="home-cards">
@@ -126,12 +126,17 @@
           <div class="game-toolbar-date" id="live-sub"></div>
         </div>
         <div class="game-toolbar-actions">
-          <button class="btn btn-secondary" onclick="openLineup('home')">布陣</button>
           <button class="btn btn-danger" onclick="endMatch()">■ 観戦を終える</button>
         </div>
       </div>
       <div id="live-scoreboard"></div>
       <div class="live-body">
+
+        <!-- スタメン（布陣）クイックアクセス -->
+        <div class="starting-member-bar">
+          <button class="btn btn-secondary btn-lg" onclick="openLineup('home')">Starting Member</button>
+          <span class="starting-member-hint">両チームのスタメン（布陣）を確認・編集できます。交代を記録すると自動で反映されます。</span>
+        </div>
 
         <!-- イベント追加フォーム -->
         <div class="event-form">
@@ -207,6 +212,7 @@
     <div id="screen-history" class="screen">
       <div class="page-header">
         <div><h1>観戦の記録</h1><div class="page-header-sub">これまでに観た試合の一覧</div></div>
+        <button class="btn btn-secondary" onclick="openTeamColorEdit()">色を編集</button>
       </div>
       <div class="content">
         <div id="match-list" class="event-list"></div>
@@ -245,9 +251,8 @@
       <div class="page-header">
         <div><h1>フォーメーション</h1><div class="page-header-sub">チームを選び、選手をドラッグ＆ドロップで配置（チーム名で保存）</div></div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          <button class="btn btn-secondary" onclick="fmExportPNG()">PNG出力</button>
-          <button class="btn btn-secondary" onclick="fmExportPDF()">PDF出力</button>
-          <button class="btn btn-primary" onclick="saveFormation()">保存</button>
+          <button class="btn btn-secondary" onclick="fmNewFormation()">新規作成</button>
+          <button class="btn btn-primary btn-lg" onclick="saveFormation()">保存</button>
         </div>
       </div>
       <div id="fm-match-banner" class="fm-match-banner" style="display:none;"></div>
@@ -257,7 +262,7 @@
           <div class="fm-toolbar">
             <div class="form-group" style="flex:1;">
               <label class="form-label" for="fm-team">チーム</label>
-              <input id="fm-team" class="input-field" type="text" list="team-options" placeholder="チーム名（例：日本）" maxlength="30" autocomplete="off" onchange="fmSelectTeam()">
+              <select id="fm-team" class="input-field" onchange="fmSelectTeam()"></select>
             </div>
             <div class="form-group fm-preset-field">
               <label class="form-label" for="fm-preset">並び</label>
@@ -407,19 +412,37 @@
 <div id="sketch-modal" class="dialog-overlay hidden">
   <div class="dialog sketch-dialog">
     <h3 id="sketch-title">手書きメモ</h3>
+    <div class="sketch-tools">
+      <button class="sketch-color active" id="sketch-c1" onclick="sketchSetColor('#14245e','sketch-c1')" style="background:#14245e" aria-label="濃紺ペン" title="濃紺"></button>
+      <button class="sketch-color" id="sketch-c2" onclick="sketchSetColor('#e3132c','sketch-c2')" style="background:#e3132c" aria-label="赤ペン" title="赤"></button>
+      <button class="sketch-tool" id="sketch-eraser" onclick="sketchToggleEraser()">消しゴム</button>
+      <button class="sketch-tool" onclick="sketchUndo()">ひとつ戻る</button>
+      <button class="sketch-tool" onclick="sketchClear()">全消去</button>
+    </div>
     <div class="sketch-wrap">
-      <canvas id="sketch-canvas" width="340" height="430"></canvas>
+      <canvas id="sketch-canvas" width="400" height="520"></canvas>
     </div>
     <div class="dialog-buttons">
-      <button class="btn btn-ghost"     onclick="sketchClear()">クリア</button>
       <button class="btn btn-secondary" onclick="closeSketch()">キャンセル</button>
       <button class="btn btn-primary"   onclick="sketchSave()">完了</button>
     </div>
   </div>
 </div>
 
+<!-- チーム名の色 編集モーダル -->
+<div id="team-color-modal" class="dialog-overlay hidden">
+  <div class="dialog tc-dialog">
+    <h3>チーム名の色を編集</h3>
+    <p class="tc-desc">記録に登場するチームの表示色を変えられます。色をタップして選択、「リセット」で初期色に戻ります。</p>
+    <div id="tc-list" class="tc-list"></div>
+    <div class="dialog-buttons">
+      <button class="btn btn-ghost" onclick="resetAllTeamColors()">全てリセット</button>
+      <button class="btn btn-primary" onclick="closeTeamColorEdit()">閉じる</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="teams-data.js?v=4"></script>
 <script src="app.js"></script>
 </body>

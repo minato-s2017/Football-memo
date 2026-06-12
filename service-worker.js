@@ -1,4 +1,4 @@
-const CACHE_NAME = 'soccer-watch-memo-v12';
+const CACHE_NAME = 'soccer-watch-memo-v14';
 const ASSETS = [
   './',
   './index.html',

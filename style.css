@@ -217,6 +217,10 @@ select.input-field { cursor: pointer; }
 .tl-memo-btn:hover { color: var(--accent-light); border-color: var(--accent); }
 .ef-memo-hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 
+/* スタメン（布陣）クイックアクセス：イベント入力フォームの直上 */
+.starting-member-bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+.starting-member-hint { font-size: 12px; color: var(--text-muted); flex: 1; min-width: 180px; line-height: 1.5; }
+
 /* 総評カード */
 .review-card {
   background: var(--card); border-radius: var(--radius);
@@ -415,6 +419,8 @@ select.input-field { cursor: pointer; }
 }
 .fm-bench.fm-bench-over { border-color: var(--accent); background: rgba(50,100,190,0.1); }
 .fm-bench-empty { color: var(--text-muted); font-size: 12px; align-self: center; }
+.fm-bench-pos { width: 100%; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.fm-bench-pos-label { font-size: 11px; font-weight: 800; color: var(--accent-light); width: 26px; flex-shrink: 0; }
 .fm-chip {
   display: flex; align-items: center; gap: 6px; background: var(--accent); color: var(--white);
   border-radius: 20px; padding: 6px 6px 6px 12px; font-size: 13px; font-weight: 700; cursor: grab;
@@ -487,6 +493,7 @@ select.input-field { cursor: pointer; }
 .squad-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--card2); border-radius: 16px; padding: 4px 6px 4px 12px; font-size: 13px; font-weight: 600; }
 .squad-chip-x { width: 16px; height: 16px; border-radius: 50%; border: none; background: rgba(255,255,255,0.2); color: var(--white); font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; padding: 0; }
 .squad-chip-x:hover { background: var(--danger); }
+.squad-add-row .input-field { flex: 0 1 66%; max-width: 66%; }
 
 /* ===== ダイアログ ===== */
 .dialog-overlay {
@@ -495,13 +502,20 @@ select.input-field { cursor: pointer; }
   display: flex; align-items: center; justify-content: center;
 }
 .dialog-overlay.hidden { display: none; }
+/* 確認ダイアログは他のモーダル（色編集など）より前面に */
+#dialog { z-index: 320; }
 .dialog { background: var(--card); border-radius: var(--radius); padding: 28px 28px 24px; width: 420px; box-shadow: var(--shadow); }
 .dialog h3 { font-size: 18px; font-weight: 700; margin-bottom: 10px; }
 .dialog p { font-size: 14px; color: var(--text-muted); margin-bottom: 24px; line-height: 1.7; white-space: pre-line; }
 .dialog-buttons { display: flex; justify-content: flex-end; gap: 10px; }
 .sketch-dialog { width: auto; max-width: 92vw; }
+.sketch-tools { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+.sketch-color { width: 28px; height: 28px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); cursor: pointer; padding: 0; }
+.sketch-color.active { border-color: #fff; box-shadow: 0 0 0 2px var(--accent-light); }
+.sketch-tool { border: 1px solid rgba(255,255,255,0.2); background: var(--card2); color: var(--text); font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+.sketch-tool.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .sketch-wrap { display: flex; justify-content: center; margin-bottom: 18px; }
-#sketch-canvas { width: 340px; max-width: 78vw; height: auto; aspect-ratio: 340 / 430; background: #fff; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); touch-action: none; cursor: crosshair; }
+#sketch-canvas { width: 400px; max-width: 80vw; height: auto; aspect-ratio: 400 / 520; background: #fff; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); touch-action: none; cursor: crosshair; }
 
 /* 試合の布陣（4c） */
 .fm-match-banner {
@@ -518,6 +532,19 @@ select.input-field { cursor: pointer; }
 }
 .tl-lineup-btn:hover { background: rgba(50,100,190,0.25); }
 .tl-sub-arrow { color: var(--accent-light); font-weight: 800; margin: 0 2px; }
+
+/* ===== チーム名の色 編集モーダル ===== */
+.tc-dialog { width: 460px; max-width: 92vw; }
+.tc-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; line-height: 1.6; }
+.tc-list { display: flex; flex-direction: column; gap: 8px; max-height: 56vh; overflow-y: auto; margin-bottom: 18px; }
+.tc-row { display: flex; align-items: center; gap: 10px; background: var(--card); border-radius: var(--radius-sm); padding: 8px 12px; }
+.tc-dot { width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0; }
+.tc-name { flex: 1; font-size: 14px; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tc-badge { font-size: 10px; font-weight: 700; color: var(--accent-light); background: rgba(50,100,190,0.18); padding: 2px 7px; border-radius: 10px; flex-shrink: 0; }
+.tc-input { width: 42px; height: 30px; padding: 2px; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; background: var(--card2); cursor: pointer; flex-shrink: 0; }
+.tc-reset { border: 1px solid rgba(255,255,255,0.18); background: var(--card2); color: var(--text-muted); font-size: 11px; font-weight: 700; padding: 6px 10px; border-radius: 6px; cursor: pointer; flex-shrink: 0; white-space: nowrap; }
+.tc-reset:hover { color: var(--text); border-color: rgba(255,255,255,0.4); }
+.tc-empty { color: var(--text-muted); font-size: 13px; text-align: center; padding: 28px 8px; line-height: 1.7; }
 
 /* ===== トースト ===== */
 .toast {
