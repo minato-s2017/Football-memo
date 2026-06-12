@@ -8,8 +8,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="観戦メモ">
-  <title>サッカー観戦メモ</title>
+  <meta name="apple-mobile-web-app-title" content="Football-Memo">
+  <title>Football-Memo</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2316308f'/%3E%3Ccircle cx='32' cy='32' r='20' fill='white'/%3E%3Cpolygon points='32,23 40.6,29.2 37.3,39.3 26.7,39.3 23.4,29.2' fill='%2316308f'/%3E%3Cg stroke='%2316308f' stroke-width='2.6' stroke-linecap='round'%3E%3Cline x1='32' y1='23' x2='32' y2='13.5'/%3E%3Cline x1='40.6' y1='29.2' x2='49.8' y2='26.2'/%3E%3Cline x1='37.3' y1='39.3' x2='43' y2='47.4'/%3E%3Cline x1='26.7' y1='39.3' x2='21' y2='47.4'/%3E%3Cline x1='23.4' y1='29.2' x2='14.2' y2='26.2'/%3E%3C/g%3E%3C/svg%3E">
   <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
   <link rel="manifest" href="manifest.json">
@@ -22,15 +22,15 @@
   <!-- サイドバー -->
   <nav class="sidebar">
     <div class="sidebar-logo">
-      <span class="sidebar-logo-icon">⚽</span>
-      <div class="sidebar-logo-text">サッカー<br>観戦メモ</div>
+      <div class="sidebar-logo-text">Football-Memo</div>
     </div>
-    <button class="nav-item active" id="nav-home"      onclick="initHome()">             <span class="nav-item-icon">🏠</span> ホーム</button>
-    <button class="nav-item"        id="nav-create"    onclick="openCreateScreen()">     <span class="nav-item-icon">✍️</span> 観戦を記録</button>
-    <button class="nav-item"        id="nav-history"   onclick="openHistoryScreen()">    <span class="nav-item-icon">📋</span> 観戦の記録</button>
-    <button class="nav-item"        id="nav-formation" onclick="openFormationScreen()">  <span class="nav-item-icon">🧩</span> フォーメーション</button>
-    <button class="nav-item"        id="nav-standings" onclick="openStandingsScreen()">  <span class="nav-item-icon">🏆</span> チーム成績</button>
-    <button class="nav-item"        id="nav-agg"       onclick="openAggScreen()">        <span class="nav-item-icon">📊</span> 集計</button>
+    <button class="nav-item active" id="nav-home"      onclick="initHome()">Home</button>
+    <button class="nav-item"        id="nav-create"    onclick="openCreateScreen()">Record</button>
+    <button class="nav-item"        id="nav-history"   onclick="openHistoryScreen()">History</button>
+    <button class="nav-item"        id="nav-team"      onclick="openTeamScreen()">Team</button>
+    <button class="nav-item"        id="nav-formation" onclick="openFormationScreen()">Formation</button>
+    <button class="nav-item"        id="nav-standings" onclick="openStandingsScreen()">Standings</button>
+    <button class="nav-item"        id="nav-agg"       onclick="openAggScreen()">Stats</button>
   </nav>
 
   <!-- メインコンテンツ -->
@@ -38,41 +38,34 @@
 
     <!-- ホーム -->
     <div id="screen-home" class="screen active">
-      <div class="page-header">
-        <div><h1>ホーム</h1><div class="page-header-sub">サッカー観戦メモ — 観た試合を記録しよう</div></div>
-      </div>
       <div class="content">
-        <div class="home-welcome">
-          <div class="home-welcome-icon">⚽</div>
-          <div>
-            <h2>サッカー観戦メモへようこそ</h2>
-            <p>観戦した試合のイベントを時系列で記録し、スコア・★評価・MOM・メモを残せます。<br>「フォーメーション」では選手をドラッグ＆ドロップで配置して保存できます。</p>
-          </div>
+        <div class="hero">
+          <div class="hero-mark">Football-Memo</div>
+          <div class="hero-tagline">観た試合を、記録する。</div>
         </div>
         <div class="home-cards">
           <div class="home-card" onclick="openCreateScreen()">
-            <div class="home-card-icon">✍️</div>
-            <div class="home-card-title">観戦を記録</div>
+            <div class="home-card-title">Record</div>
             <div class="home-card-desc">対戦カード・日付を入力して観戦を開始</div>
           </div>
           <div class="home-card" onclick="openHistoryScreen()">
-            <div class="home-card-icon">📋</div>
-            <div class="home-card-title">観戦の記録</div>
+            <div class="home-card-title">History</div>
             <div class="home-card-desc">過去に観た試合の一覧と詳細</div>
           </div>
+          <div class="home-card" onclick="openTeamScreen()">
+            <div class="home-card-title">Team</div>
+            <div class="home-card-desc">グループ・チーム・選手の管理</div>
+          </div>
           <div class="home-card" onclick="openFormationScreen()">
-            <div class="home-card-icon">🧩</div>
-            <div class="home-card-title">フォーメーション</div>
+            <div class="home-card-title">Formation</div>
             <div class="home-card-desc">選手をドラッグ＆ドロップで配置・保存</div>
           </div>
           <div class="home-card" onclick="openStandingsScreen()">
-            <div class="home-card-icon">🏆</div>
-            <div class="home-card-title">チーム成績</div>
+            <div class="home-card-title">Standings</div>
             <div class="home-card-desc">観戦した試合からの勝点・得失点表</div>
           </div>
           <div class="home-card" onclick="openAggScreen()">
-            <div class="home-card-icon">📊</div>
-            <div class="home-card-title">集計</div>
+            <div class="home-card-title">Stats</div>
             <div class="home-card-desc">得点者ランキング・MOM回数・平均評価</div>
           </div>
         </div>
@@ -111,12 +104,12 @@
             <input id="m-venue" class="input-field" type="text" placeholder="例：埼玉スタジアム2002" maxlength="40" autocomplete="off">
           </div>
           <div class="form-group">
-            <label class="form-label" for="m-method">視聴方法</label>
+            <label class="form-label" for="m-method">視聴方法（任意）</label>
             <select id="m-method" class="input-field">
               <option value="">未選択</option>
-              <option value="stadium">🏟 スタジアム</option>
-              <option value="tv">📺 テレビ</option>
-              <option value="stream">💻 配信</option>
+              <option value="stadium">スタジアム</option>
+              <option value="tv">テレビ</option>
+              <option value="stream">配信</option>
               <option value="other">その他</option>
             </select>
           </div>
@@ -132,7 +125,10 @@
           <div class="game-toolbar-title" id="live-title"></div>
           <div class="game-toolbar-date" id="live-sub"></div>
         </div>
-        <button class="btn btn-danger" onclick="endMatch()">■ 観戦を終える</button>
+        <div class="game-toolbar-actions">
+          <button class="btn btn-secondary" onclick="openLineup('home')">布陣</button>
+          <button class="btn btn-danger" onclick="endMatch()">■ 観戦を終える</button>
+        </div>
       </div>
       <div id="live-scoreboard"></div>
       <div class="live-body">
@@ -143,6 +139,13 @@
             <div class="ef-field ef-minute">
               <label class="form-label">分</label>
               <input id="ev-minute" class="input-field" type="number" min="0" max="130" placeholder="45">
+            </div>
+            <div class="ef-field">
+              <label class="form-label">時間帯</label>
+              <div class="seg" id="ev-half-seg">
+                <button class="seg-btn active" id="evhalf-1" onclick="setEvHalf(1)">前半</button>
+                <button class="seg-btn"        id="evhalf-2" onclick="setEvHalf(2)">後半</button>
+              </div>
             </div>
             <div class="ef-field">
               <label class="form-label">チーム</label>
@@ -164,15 +167,16 @@
           </div>
           <div class="ef-row">
             <div class="ef-field ef-grow">
-              <label class="form-label">選手・内容</label>
+              <label class="form-label" id="ev-player-label">選手・内容</label>
               <input id="ev-player" class="input-field" type="text" list="player-options" placeholder="得点者・選手名など" maxlength="40" autocomplete="off">
             </div>
-            <div class="ef-field ef-grow">
-              <label class="form-label">ひとこと（任意）</label>
-              <input id="ev-note" class="input-field" type="text" placeholder="アシスト・状況・場面など" maxlength="60" autocomplete="off">
+            <div class="ef-field ef-grow" id="ev-player2-field" style="display:none;">
+              <label class="form-label">IN（入る選手）</label>
+              <input id="ev-player2" class="input-field" type="text" list="player-options" placeholder="入る選手" maxlength="40" autocomplete="off">
             </div>
             <button class="btn btn-primary" style="align-self:flex-end;" onclick="addEvent()">＋ 記録</button>
           </div>
+          <div class="ef-memo-hint">記録した各イベントの「✎」から、状況を<strong>手書きメモ</strong>で残せます。</div>
         </div>
 
         <div class="section-title" style="margin:22px 0 12px;">タイムライン</div>
@@ -227,35 +231,50 @@
       </div>
     </div>
 
+    <!-- TEAM（グループ→チーム→選手） -->
+    <div id="screen-team" class="screen">
+      <div class="page-header">
+        <div><h1 id="team-title">チーム</h1><div class="page-header-sub" id="team-sub">グループ → チーム → 選手</div></div>
+        <div id="team-header-actions"></div>
+      </div>
+      <div class="content" id="team-content"></div>
+    </div>
+
     <!-- フォーメーション -->
     <div id="screen-formation" class="screen">
       <div class="page-header">
-        <div><h1>フォーメーション</h1><div class="page-header-sub">選手をドラッグ＆ドロップでピッチに配置して保存</div></div>
-        <div style="display:flex;gap:10px;">
-          <button class="btn btn-secondary" onclick="newFormation()">＋ 新規</button>
-          <button class="btn btn-primary" onclick="saveFormation()">💾 保存</button>
+        <div><h1>フォーメーション</h1><div class="page-header-sub">チームを選び、選手をドラッグ＆ドロップで配置（チーム名で保存）</div></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-secondary" onclick="fmExportPNG()">PNG出力</button>
+          <button class="btn btn-secondary" onclick="fmExportPDF()">PDF出力</button>
+          <button class="btn btn-primary" onclick="saveFormation()">保存</button>
         </div>
       </div>
+      <div id="fm-match-banner" class="fm-match-banner" style="display:none;"></div>
       <div class="fm-layout">
         <!-- 左：ピッチ -->
         <div class="fm-pitch-col">
           <div class="fm-toolbar">
             <div class="form-group" style="flex:1;">
-              <label class="form-label" for="fm-name">フォーメーション名</label>
-              <input id="fm-name" class="input-field" type="text" placeholder="例：日本代表ベスト11" maxlength="30" autocomplete="off">
+              <label class="form-label" for="fm-team">チーム</label>
+              <input id="fm-team" class="input-field" type="text" list="team-options" placeholder="チーム名（例：日本）" maxlength="30" autocomplete="off" onchange="fmSelectTeam()">
             </div>
             <div class="form-group fm-preset-field">
               <label class="form-label" for="fm-preset">並び</label>
               <select id="fm-preset" class="input-field" onchange="fmChangePreset()">
-                <option value="4-4-2">4-4-2</option>
                 <option value="4-3-3">4-3-3</option>
                 <option value="4-2-3-1">4-2-3-1</option>
+                <option value="3-4-2-1">3-4-2-1</option>
+                <option value="4-4-2">4-4-2</option>
+                <option value="5-4-1">5-4-1</option>
                 <option value="3-5-2">3-5-2</option>
                 <option value="3-4-3">3-4-3</option>
+                <option value="5-3-2">5-3-2</option>
+                <option value="custom">カスタム（自由配置）</option>
               </select>
             </div>
           </div>
-          <div class="fm-pitch">
+          <div class="fm-pitch" id="fm-pitch">
             <svg class="fm-pitch-lines" viewBox="0 0 100 150" preserveAspectRatio="none">
               <g fill="none" stroke="#ffffff" stroke-width="0.6" opacity="0.55">
                 <rect x="3" y="3" width="94" height="144"/>
@@ -270,22 +289,17 @@
             </svg>
             <div id="fm-pitch-slots" class="fm-pitch-slots"></div>
           </div>
+          <div id="fm-custom-hint" class="fm-custom-hint" style="display:none;">「カスタム（自由配置）」では枠をドラッグして自由に動かせます（選手は枠ごと移動します）。</div>
         </div>
         <!-- 右：パネル -->
         <div class="fm-side">
-          <div class="form-group">
-            <label class="form-label" for="fm-team">チーム名（任意）</label>
-            <input id="fm-team" class="input-field" type="text" placeholder="例：日本代表" maxlength="30" autocomplete="off">
-          </div>
-          <div class="section-title" style="margin-top:6px;">選手リスト</div>
-          <div class="fm-roster-hint">選手を追加し、下のチップをピッチの枠へドラッグして配置します。枠から枠へ移動・入れ替えも可能です。</div>
-          <div class="input-row">
-            <input id="fm-player-input" class="input-field" type="text" placeholder="選手名" maxlength="20" autocomplete="off">
-            <button class="btn btn-primary" onclick="fmAddPlayer()">追加</button>
-          </div>
+          <div class="section-title">選手（控え）</div>
+          <div class="fm-roster-hint">「チーム」を選ぶと Team タブの選手が下に並びます。選手をピッチの枠へドラッグして配置（枠↔枠の移動・入れ替えも可）。</div>
           <div id="fm-bench" class="fm-bench"></div>
-          <div class="section-title" style="margin-top:10px;">保存済み</div>
-          <div id="fm-saved-list" class="fm-saved-list"></div>
+          <div id="fm-saved-wrap">
+            <div class="section-title" style="margin-top:10px;">保存済み（チーム別）</div>
+            <div id="fm-saved-list" class="fm-saved-list"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -294,7 +308,7 @@
     <div id="screen-standings" class="screen">
       <div class="page-header">
         <div><h1>チーム成績</h1><div class="page-header-sub">観戦した試合からの集計（勝=3 / 分=1 / 負=0）</div></div>
-        <button class="btn btn-secondary" onclick="openStandingsScreen()">🔄 更新</button>
+        <button class="btn btn-secondary" onclick="openStandingsScreen()">更新</button>
       </div>
       <div class="content">
         <div id="standings-table-area"></div>
@@ -305,22 +319,20 @@
     <!-- 集計 -->
     <div id="screen-agg" class="screen">
       <div class="page-header">
-        <div><h1>集計</h1><div class="page-header-sub">複数の試合を選択して得点者・MOM・評価を集計</div></div>
-        <button class="btn btn-primary" onclick="calcAgg()">📊 集計する</button>
+        <div><h1>集計</h1><div class="page-header-sub">大会・チームで絞り込んで集計</div></div>
       </div>
-      <div class="agg-layout">
-        <div class="agg-panel agg-panel-left">
-          <div class="section-title" style="margin-bottom:12px;">試合を選択</div>
-          <div id="agg-match-list" class="agg-event-check-list"></div>
-        </div>
-        <div class="agg-panel">
-          <div id="agg-result">
-            <div class="agg-placeholder">
-              <div class="agg-placeholder-icon">📊</div>
-              <div>左の一覧から試合を選択して<br>「集計する」ボタンを押してください</div>
-            </div>
+      <div class="content">
+        <div class="agg-filters">
+          <div class="form-group">
+            <label class="form-label" for="agg-comp">大会・リーグ</label>
+            <select id="agg-comp" class="input-field" onchange="calcAgg()"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="agg-team">チーム</label>
+            <select id="agg-team" class="input-field" onchange="calcAgg()"></select>
           </div>
         </div>
+        <div id="agg-result"></div>
       </div>
     </div>
 
@@ -344,7 +356,71 @@
   </div>
 </div>
 
+<!-- TEAM 追加モーダル（フォルダ／チーム） -->
+<div id="team-add-modal" class="dialog-overlay hidden">
+  <div class="dialog">
+    <h3>追加</h3>
+    <div class="seg" style="margin-bottom:18px;">
+      <button class="seg-btn active" id="tam-mode-folder" onclick="teamAddSetMode('folder')">フォルダ</button>
+      <button class="seg-btn"        id="tam-mode-team"   onclick="teamAddSetMode('team')">チーム</button>
+    </div>
+    <div id="tam-folder-fields">
+      <div class="form-group">
+        <label class="form-label" for="tam-folder-name">フォルダ名</label>
+        <input id="tam-folder-name" class="input-field" type="text" placeholder="例：グループM" maxlength="20" autocomplete="off">
+      </div>
+    </div>
+    <div id="tam-team-fields" style="display:none;">
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label" for="tam-team-folder">フォルダ</label>
+        <select id="tam-team-folder" class="input-field"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="tam-team-name">チーム名</label>
+        <input id="tam-team-name" class="input-field" type="text" placeholder="例：日本" maxlength="30" autocomplete="off">
+      </div>
+    </div>
+    <div class="dialog-buttons">
+      <button class="btn btn-secondary" onclick="closeTeamAdd()">キャンセル</button>
+      <button class="btn btn-primary"   onclick="doTeamAdd()">作成</button>
+    </div>
+  </div>
+</div>
+
+<!-- 布陣ビューア モーダル -->
+<div id="lineup-modal" class="dialog-overlay hidden">
+  <div class="dialog lineup-dialog">
+    <h3 id="lineup-title">布陣</h3>
+    <div class="seg" id="lineup-side-seg" style="margin-bottom:14px;">
+      <button class="seg-btn active" id="lineup-side-home" onclick="setLineupSide('home')">ホーム</button>
+      <button class="seg-btn"        id="lineup-side-away" onclick="setLineupSide('away')">アウェイ</button>
+    </div>
+    <div id="lineup-canvas-wrap" class="lineup-canvas-wrap"></div>
+    <div class="dialog-buttons">
+      <button class="btn btn-secondary" onclick="editMatchLineup()">この画面で編集</button>
+      <button class="btn btn-primary"   onclick="closeLineup()">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- 手書きメモ モーダル -->
+<div id="sketch-modal" class="dialog-overlay hidden">
+  <div class="dialog sketch-dialog">
+    <h3 id="sketch-title">手書きメモ</h3>
+    <div class="sketch-wrap">
+      <canvas id="sketch-canvas" width="340" height="430"></canvas>
+    </div>
+    <div class="dialog-buttons">
+      <button class="btn btn-ghost"     onclick="sketchClear()">クリア</button>
+      <button class="btn btn-secondary" onclick="closeSketch()">キャンセル</button>
+      <button class="btn btn-primary"   onclick="sketchSave()">完了</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="teams-data.js?v=4"></script>
 <script src="app.js"></script>
 </body>
 </html>

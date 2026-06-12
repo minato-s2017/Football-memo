@@ -17,7 +17,7 @@ const EVENT_TYPES = {
   sub:    { icon: '🔄', label: '交代',   cls: 'tl-sub' },
   note:   { icon: '📝', label: 'メモ',   cls: 'tl-note' },
 };
-const WATCH_METHODS = { stadium: '🏟 スタジアム', tv: '📺 テレビ', stream: '💻 配信', other: 'その他' };
+const WATCH_METHODS = { stadium: 'スタジアム', tv: 'テレビ', stream: '配信', other: 'その他' };
 
 // ===== データ管理（localStorage・端末内のみ） =====
 const DB = {
@@ -58,6 +58,7 @@ function showScreen(id) {
     home:'nav-home',
     create:'nav-create', live:'nav-create',
     history:'nav-history', detail:'nav-history',
+    team:'nav-team',
     formation:'nav-formation',
     standings:'nav-standings',
     agg:'nav-agg',
@@ -103,6 +104,8 @@ function refreshDatalists() {
     if (m.mom) players.add(m.mom);
     (m.events || []).forEach(e => { if (e.player) players.add(e.player); });
   });
+  // TEAMタブに登録したチーム名も候補に含める
+  try { TEAMDB.ensureSeed(); TEAMDB.allTeamNames().forEach(n => teams.add(n)); } catch {}
   const fill = (id, set) => {
     const el = document.getElementById(id);
     if (el) el.innerHTML = [...set].sort().map(v => `<option value="${escHtml(v)}">`).join('');
@@ -157,6 +160,7 @@ function startMatch() {
 let currentMatchId = null;
 let liveSide = 'home';
 let liveType = 'goal';
+let liveHalf = 1;
 
 function openLiveScreen(matchId) {
   currentMatchId = matchId;
@@ -164,8 +168,9 @@ function openLiveScreen(matchId) {
   if (!m) return;
   refreshDatalists();
 
-  liveSide = 'home'; liveType = 'goal';
+  liveSide = 'home'; liveType = 'goal'; liveHalf = 1;
   syncSegButtons();
+  evSyncSubFields();
 
   document.getElementById('live-title').textContent = matchTitle(m);
   document.getElementById('live-sub').textContent =
@@ -173,7 +178,7 @@ function openLiveScreen(matchId) {
 
   document.getElementById('ev-minute').value = '';
   document.getElementById('ev-player').value = '';
-  document.getElementById('ev-note').value   = '';
+  document.getElementById('ev-player2').value = '';
   document.getElementById('live-mom').value  = m.mom || '';
   document.getElementById('live-memo').value = m.memo || '';
 
@@ -184,10 +189,18 @@ function openLiveScreen(matchId) {
 }
 
 function setEvSide(side) { liveSide = side; syncSegButtons(); }
-function setEvType(type) { liveType = type; syncSegButtons(); }
+function setEvType(type) { liveType = type; syncSegButtons(); evSyncSubFields(); }
+function setEvHalf(h) { liveHalf = h; syncSegButtons(); }
+function evSyncSubFields() {
+  const isSub = liveType === 'sub';
+  document.getElementById('ev-player2-field').style.display = isSub ? '' : 'none';
+  document.getElementById('ev-player-label').textContent = isSub ? 'OUT（退く選手）' : '選手・内容';
+}
 function syncSegButtons() {
   document.getElementById('evside-home').classList.toggle('active', liveSide === 'home');
   document.getElementById('evside-away').classList.toggle('active', liveSide === 'away');
+  document.getElementById('evhalf-1').classList.toggle('active', liveHalf === 1);
+  document.getElementById('evhalf-2').classList.toggle('active', liveHalf === 2);
   ['goal','yellow','red','sub','note'].forEach(t => {
     document.getElementById('evtype-' + t).classList.toggle('active', liveType === t);
   });
@@ -201,19 +214,16 @@ function addEvent() {
   const minuteRaw = document.getElementById('ev-minute').value.trim();
   const minute = minuteRaw === '' ? null : Math.max(0, parseInt(minuteRaw, 10) || 0);
   const player = document.getElementById('ev-player').value.trim();
-  const note   = document.getElementById('ev-note').value.trim();
+  const playerIn = liveType === 'sub' ? document.getElementById('ev-player2').value.trim() : '';
 
-  if (!player && !note && liveType !== 'goal') {
-    showToast('選手・内容を入力してください');
-    return;
-  }
-
-  m.events.push({ id: uuid(), minute, type: liveType, side: liveSide, player, note });
+  const ev = { id: uuid(), minute, half: liveHalf, type: liveType, side: liveSide, player, playerIn, note: '', sketch: '' };
+  m.events.push(ev);
+  if (liveType === 'sub') applySub(m, ev);
   DB.saveMatches(matches);
 
   document.getElementById('ev-minute').value = '';
   document.getElementById('ev-player').value = '';
-  document.getElementById('ev-note').value   = '';
+  document.getElementById('ev-player2').value = '';
   document.getElementById('ev-player').focus();
 
   renderLiveScoreboard();
@@ -269,7 +279,18 @@ function timelineItemHtml(m, e, editable) {
   const tag = teamName
     ? `<span class="tl-team-tag" style="background:${teamColor(teamName)}">${escHtml(teamName)}</span>`
     : '';
-  const main = e.player ? escHtml(e.player) : `<span style="color:var(--text-muted)">${def.label}</span>`;
+  let main;
+  if (e.type === 'sub' && e.playerIn) {
+    main = `${e.player ? escHtml(e.player) : '—'} <span class="tl-sub-arrow">→</span> ${escHtml(e.playerIn)}`;
+  } else {
+    main = e.player ? escHtml(e.player) : `<span style="color:var(--text-muted)">${def.label}</span>`;
+  }
+  const lineupBtn = e.type === 'sub'
+    ? `<button class="tl-lineup-btn" onclick="openLineup('${e.side}')" title="布陣を見る">布陣</button>`
+    : '';
+  const sketch = e.sketch
+    ? `<img class="tl-sketch" src="${e.sketch}" onclick="openSketch('${e.id}')" alt="手書きメモ" title="手書きメモ">`
+    : `<button class="tl-memo-btn" onclick="openSketch('${e.id}')" title="手書きメモを追加">✎</button>`;
   const del = editable ? `<button class="tl-del" onclick="deleteEvent('${e.id}')" title="削除">×</button>` : '';
   return `<div class="tl-item ${def.cls}">
     <div class="tl-minute">${minuteLabel(e.minute)}</div>
@@ -278,18 +299,80 @@ function timelineItemHtml(m, e, editable) {
       <div class="tl-player">${tag}${main}</div>
       ${e.note ? `<div class="tl-note-text">${escHtml(e.note)}</div>` : ''}
     </div>
+    ${lineupBtn}
+    ${sketch}
     ${del}
   </div>`;
+}
+
+// 前半・後半でグループ化して表示
+function timelineHtml(m, editable) {
+  const evs = sortedEvents(m);
+  if (!evs.length) return `<div class="tl-empty">まだイベントがありません。${editable ? '上のフォームから記録してください。' : ''}</div>`;
+  const h1 = evs.filter(e => (e.half || 1) === 1);
+  const h2 = evs.filter(e => e.half === 2);
+  let out = `<div class="tl-half-label">前半</div>`;
+  out += h1.length ? h1.map(e => timelineItemHtml(m, e, editable)).join('') : `<div class="tl-empty">前半のイベントなし</div>`;
+  out += `<div class="tl-half-label">後半</div>`;
+  out += h2.length ? h2.map(e => timelineItemHtml(m, e, editable)).join('') : `<div class="tl-empty">後半のイベントなし</div>`;
+  return out;
 }
 
 function renderTimeline() {
   const m = DB.matches.find(x => x.id === currentMatchId);
   if (!m) return;
-  const list = document.getElementById('live-timeline');
-  const events = sortedEvents(m);
-  list.innerHTML = events.length === 0
-    ? `<div class="tl-empty">まだイベントがありません。上のフォームから記録してください。</div>`
-    : events.map(e => timelineItemHtml(m, e, true)).join('');
+  document.getElementById('live-timeline').innerHTML = timelineHtml(m, true);
+}
+
+// ===== 手書きメモ（各イベント・キャンバス描画） =====
+let sketchEventId = null, sketchCtx = null, sketchDrawing = false, sketchLast = null;
+function sketchPitchBg() {
+  const c = document.getElementById('sketch-canvas'); const ctx = sketchCtx, W = c.width, H = c.height;
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = '#c8d2e0'; ctx.lineWidth = 1.5;
+  const mg = 8;
+  ctx.strokeRect(mg, mg, W - 2*mg, H - 2*mg);
+  ctx.beginPath(); ctx.moveTo(mg, H/2); ctx.lineTo(W - mg, H/2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(W/2, H/2, 30, 0, Math.PI*2); ctx.stroke();
+  const bw = W*0.5, bh = H*0.12;
+  ctx.strokeRect((W-bw)/2, mg, bw, bh);
+  ctx.strokeRect((W-bw)/2, H - mg - bh, bw, bh);
+}
+function openSketch(eid) {
+  const m = DB.matches.find(x => x.id === currentMatchId); if (!m) return;
+  const ev = m.events.find(e => e.id === eid); if (!ev) return;
+  sketchEventId = eid;
+  const c = document.getElementById('sketch-canvas');
+  sketchCtx = c.getContext('2d');
+  sketchPitchBg();
+  if (ev.sketch) { const img = new Image(); img.onload = () => sketchCtx.drawImage(img, 0, 0, c.width, c.height); img.src = ev.sketch; }
+  document.getElementById('sketch-modal').classList.remove('hidden');
+}
+function closeSketch() { document.getElementById('sketch-modal').classList.add('hidden'); sketchEventId = null; sketchDrawing = false; }
+function sketchClear() { if (sketchCtx) sketchPitchBg(); }
+function sketchPos(e) {
+  const c = document.getElementById('sketch-canvas'); const r = c.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * (c.width / r.width), y: (e.clientY - r.top) * (c.height / r.height) };
+}
+function sketchDown(e) { if (!sketchCtx) return; e.preventDefault(); sketchDrawing = true; sketchLast = sketchPos(e); }
+function sketchMove(e) {
+  if (!sketchDrawing || !sketchCtx) return; e.preventDefault();
+  const p = sketchPos(e), ctx = sketchCtx;
+  ctx.strokeStyle = '#14245e'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(sketchLast.x, sketchLast.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+  sketchLast = p;
+}
+function sketchEnd() { sketchDrawing = false; }
+function sketchSave() {
+  const c = document.getElementById('sketch-canvas');
+  const data = c.toDataURL('image/png');
+  const matches = DB.matches; const m = matches.find(x => x.id === currentMatchId);
+  const ev = m && m.events.find(e => e.id === sketchEventId);
+  if (ev) { ev.sketch = data; DB.saveMatches(matches); }
+  closeSketch();
+  const active = document.querySelector('.screen.active')?.id;
+  if (active === 'screen-detail') openMatchDetail(currentMatchId);
+  else renderTimeline();
 }
 
 function renderRatingStars() {
@@ -338,7 +421,7 @@ function openHistoryScreen() {
   const matches = DB.matches.slice().reverse();
   const list = document.getElementById('match-list');
   if (matches.length === 0) {
-    list.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div>観戦の記録がありません。<br>「観戦を記録」から始めましょう。</div>`;
+    list.innerHTML = `<div class="empty-state">観戦の記録がありません。<br>「観戦を記録」から始めましょう。</div>`;
   } else {
     list.innerHTML = matches.map(m => {
       const badge = m.finished
@@ -388,16 +471,13 @@ function openMatchDetail(matchId) {
     ? meta.map(([k,v]) => `<div class="meta-item"><span class="meta-label">${k}：</span><span>${escHtml(v)}</span></div>`).join('')
     : `<span style="color:var(--text-muted)">（大会・会場・視聴方法の記録はありません）</span>`;
 
-  const events = sortedEvents(m);
-  document.getElementById('detail-timeline').innerHTML = events.length === 0
-    ? `<div class="tl-empty">イベントの記録はありません。</div>`
-    : events.map(e => timelineItemHtml(m, e, false)).join('');
+  document.getElementById('detail-timeline').innerHTML = timelineHtml(m, false);
 
   const starHtml = [1,2,3,4,5].map(n => `<span class="star readonly ${n <= (m.rating||0) ? 'on' : ''}">★</span>`).join('');
   const reviewParts = [];
   reviewParts.push(`<div class="detail-review-row">
       <div class="rating-stars">${starHtml}</div>
-      ${m.mom ? `<div class="mom-pill">⭐ MOM：${escHtml(m.mom)}</div>` : ''}
+      ${m.mom ? `<div class="mom-pill">MOM：${escHtml(m.mom)}</div>` : ''}
     </div>`);
   if (m.memo && m.memo.trim()) {
     reviewParts.push(`<div class="detail-memo-text">${escHtml(m.memo)}</div>`);
@@ -427,11 +507,11 @@ async function deleteMatch() {
 
 // ===== チーム成績 =====
 function openStandingsScreen() {
+  TEAMDB.ensureSeed();
   const matches = DB.matches.filter(m => m.finished && m.homeTeam && m.awayTeam);
 
   const stats = {};
   const ensure = name => { if (!stats[name]) stats[name] = { name, gp:0, w:0, d:0, l:0, gf:0, ga:0 }; return stats[name]; };
-
   matches.forEach(m => {
     const hs = goalCount(m, 'home');
     const as = goalCount(m, 'away');
@@ -445,18 +525,28 @@ function openStandingsScreen() {
     else              { H.d++; A.d++; }
   });
 
-  const ranked = Object.values(stats).map(s => ({
-    ...s, pts: s.w * 3 + s.d, diff: s.gf - s.ga,
-  })).sort((a, b) => b.pts - a.pts || b.diff - a.diff || b.gf - a.gf);
-
+  const withPts = s => ({ ...s, pts: s.w * 3 + s.d, diff: s.gf - s.ga });
+  const sortFn = (a, b) => b.pts - a.pts || b.diff - a.diff || b.gf - a.gf || a.name.localeCompare(b.name);
   const medal = ['gold','silver','bronze'];
-  const rows = ranked.map((t, rank) => `
+
+  // チーム名 → 所属フォルダ(グループ)
+  const teamFolder = {};
+  TEAMDB.data.groups.forEach(g => g.teams.forEach(t => { teamFolder[t.name] = g.id; }));
+
+  // 成績のあるチームをフォルダ別に振り分け
+  const folderTeams = {};
+  const unsorted = [];
+  Object.values(stats).filter(s => s.gp > 0).forEach(s => {
+    const fid = teamFolder[s.name];
+    if (fid !== undefined) (folderTeams[fid] = folderTeams[fid] || []).push(withPts(s));
+    else unsorted.push(withPts(s));
+  });
+
+  const tableHtml = (teams) => {
+    const rows = teams.slice().sort(sortFn).map((t, rank) => `
       <div class="ranking-row">
         <div class="rank-num ${rank < 3 ? medal[rank] : ''}">${rank + 1}</div>
-        <div class="rank-name">
-          <div class="team-color-dot" style="background:${teamColor(t.name)}"></div>
-          ${escHtml(t.name)}
-        </div>
+        <div class="rank-name"><div class="team-color-dot" style="background:${teamColor(t.name)}"></div>${escHtml(t.name)}</div>
         <div class="rank-cell">${t.gp}</div>
         <div class="rank-cell win">${t.w}</div>
         <div class="rank-cell draw">${t.d}</div>
@@ -464,10 +554,7 @@ function openStandingsScreen() {
         <div class="rank-cell">${t.diff >= 0 ? '+' : ''}${t.diff}</div>
         <div class="rank-cell pts-col">${t.pts}</div>
       </div>`).join('');
-
-  document.getElementById('standings-table-area').innerHTML = ranked.length === 0
-    ? `<div class="empty-state"><div class="empty-icon">🏆</div>記録済みの観戦がありません。<br>観戦を記録すると成績表が作られます。</div>`
-    : `<div class="ranking-table">
+    return `<div class="ranking-table">
         <div class="ranking-header">
           <div></div><div>チーム</div>
           <div style="text-align:center">試合</div>
@@ -476,9 +563,19 @@ function openStandingsScreen() {
           <div style="text-align:center;color:var(--danger)">負</div>
           <div style="text-align:center">得失</div>
           <div style="text-align:center;color:var(--accent-light)">勝点</div>
-        </div>
-        ${rows}
+        </div>${rows}
       </div>`;
+  };
+
+  let html = '';
+  TEAMDB.data.groups.forEach(g => {
+    const ts = folderTeams[g.id];
+    if (ts && ts.length) html += `<div class="standings-group"><div class="standings-group-head">グループ ${escHtml(g.id)}</div>${tableHtml(ts)}</div>`;
+  });
+  if (unsorted.length) html += `<div class="standings-group"><div class="standings-group-head">未分類（フォルダ未登録）</div>${tableHtml(unsorted)}</div>`;
+
+  document.getElementById('standings-table-area').innerHTML = html ||
+    `<div class="empty-state">記録済みの観戦がありません。<br>観戦を記録すると成績表が作られます。</div>`;
 
   const matchRows = matches.slice().reverse().map(m => `
       <div class="event-row" onclick="openMatchDetail('${m.id}')">
@@ -501,121 +598,118 @@ function openStandingsScreen() {
   showScreen('standings');
 }
 
-// ===== 集計 =====
+// ===== 集計（大会・チームで絞り込み） =====
 function openAggScreen() {
-  const matches = DB.matches.slice().reverse();
-  const list = document.getElementById('agg-match-list');
-  if (matches.length === 0) {
-    list.innerHTML = `<div style="color:var(--text-muted);font-size:13px;">観戦の記録がありません。</div>`;
-  } else {
-    list.innerHTML = matches.map(m => `
-        <div class="agg-event-item" id="agg-check-${m.id}" onclick="toggleAggMatch('${m.id}')">
-          <div class="check-box" id="agg-checkmark-${m.id}"></div>
-          <div style="flex:1;min-width:0;">
-            <div class="agg-event-name">${escHtml(m.homeTeam || '?')} vs ${escHtml(m.awayTeam || '?')}　<span style="color:var(--text-muted);font-weight:600;">${goalCount(m,'home')}-${goalCount(m,'away')}</span></div>
-            <div class="agg-event-date">${[formatDate(m.date), m.competition].filter(Boolean).join('　')}</div>
-          </div>
-        </div>`).join('');
-  }
-  document.getElementById('agg-result').innerHTML = `
-    <div class="agg-placeholder">
-      <div class="agg-placeholder-icon">📊</div>
-      <div>左の一覧から試合を選択して<br>「集計する」ボタンを押してください</div>
-    </div>`;
+  const matches = DB.matches;
+  const comps = [...new Set(matches.map(m => m.competition).filter(Boolean))].sort();
+  const teams = [...new Set(matches.flatMap(m => [m.homeTeam, m.awayTeam]).filter(Boolean))].sort();
+  const compSel = document.getElementById('agg-comp');
+  const teamSel = document.getElementById('agg-team');
+  const prevComp = compSel.value, prevTeam = teamSel.value;
+  compSel.innerHTML = `<option value="">すべての大会</option>` + comps.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
+  teamSel.innerHTML = `<option value="">すべてのチーム</option>` + teams.map(t => `<option value="${escHtml(t)}">${escHtml(t)}</option>`).join('');
+  if ([...compSel.options].some(o => o.value === prevComp)) compSel.value = prevComp;
+  if ([...teamSel.options].some(o => o.value === prevTeam)) teamSel.value = prevTeam;
+  calcAgg();
   showScreen('agg');
 }
 
-function toggleAggMatch(id) {
-  const item = document.getElementById('agg-check-' + id);
-  const box  = document.getElementById('agg-checkmark-' + id);
-  const checked = item.classList.toggle('checked');
-  box.textContent = checked ? '✓' : '';
-}
+const AGG_MEDAL = ['gold', 'silver', 'bronze'];
 
 function calcAgg() {
-  const selected = DB.matches.filter(m => document.getElementById('agg-check-' + m.id)?.classList.contains('checked'));
-  if (selected.length === 0) { showToast('試合を1つ以上選択してください'); return; }
+  const comp = document.getElementById('agg-comp').value;
+  const team = document.getElementById('agg-team').value;
+  let matches = DB.matches.slice();
+  if (comp) matches = matches.filter(m => m.competition === comp);
+  if (team) matches = matches.filter(m => m.homeTeam === team || m.awayTeam === team);
 
-  let totalGoals = 0, yellow = 0, red = 0, ratingSum = 0, ratingCount = 0;
-  const scorers = {};
-  const moms = {};
+  const result = document.getElementById('agg-result');
+  if (matches.length === 0) {
+    result.innerHTML = `<div class="empty-state">該当する観戦記録がありません。</div>`;
+    return;
+  }
 
-  selected.forEach(m => {
-    (m.events || []).forEach(e => {
-      if (e.type === 'goal') {
-        totalGoals++;
-        if (e.player) {
-          if (!scorers[e.player]) scorers[e.player] = { goals: 0, matches: new Set() };
-          scorers[e.player].goals++;
-          scorers[e.player].matches.add(m.id);
-        }
-      } else if (e.type === 'yellow') yellow++;
-      else if (e.type === 'red') red++;
-    });
-    if (m.rating) { ratingSum += m.rating; ratingCount++; }
-    if (m.mom) moms[m.mom] = (moms[m.mom] || 0) + 1;
-  });
-
-  const avgGoals  = (totalGoals / selected.length).toFixed(1);
-  const avgRating = ratingCount ? (ratingSum / ratingCount).toFixed(1) : '—';
-
-  const summary = `
-    <div class="summary-grid">
-      <div class="summary-card"><div class="summary-value">${selected.length}</div><div class="summary-label">観戦試合数</div></div>
-      <div class="summary-card"><div class="summary-value">${totalGoals}</div><div class="summary-label">総ゴール数</div></div>
-      <div class="summary-card"><div class="summary-value">${avgGoals}</div><div class="summary-label">平均ゴール / 試合</div></div>
-      <div class="summary-card"><div class="summary-value">${avgRating}</div><div class="summary-label">平均★評価</div></div>
-      <div class="summary-card"><div class="summary-value">🟨 ${yellow}</div><div class="summary-label">警告（イエロー）</div></div>
-      <div class="summary-card"><div class="summary-value">🟥 ${red}</div><div class="summary-label">退場（レッド）</div></div>
-    </div>`;
-
-  const medal = ['gold','silver','bronze'];
-  const scorerArr = Object.entries(scorers).map(([name, s]) => ({ name, goals: s.goals, games: s.matches.size }))
-    .sort((a, b) => b.goals - a.goals || a.name.localeCompare(b.name));
-  const scorerRows = scorerArr.length === 0
-    ? `<div class="stats-table-row"><div></div><div class="stat-cell name" style="color:var(--text-muted)">得点者の記録がありません</div><div></div><div></div></div>`
-    : scorerArr.map((s, i) => `
-        <div class="stats-table-row">
-          <div class="stat-rank ${i < 3 ? medal[i] : ''}">${i + 1}</div>
-          <div class="stat-cell name">${escHtml(s.name)}</div>
-          <div class="stat-cell">${s.goals}</div>
-          <div class="stat-cell sub">${s.games}試合</div>
-        </div>`).join('');
-
-  const scorerTable = `
-    <div class="stats-table">
-      <div class="stats-table-title">⚽ 得点者ランキング</div>
-      <div class="stats-table-header"><div></div><div>選手</div><div style="text-align:center">ゴール</div><div style="text-align:center">出場試合</div></div>
-      ${scorerRows}
-    </div>`;
-
-  const momArr = Object.entries(moms).map(([name, c]) => ({ name, c })).sort((a, b) => b.c - a.c || a.name.localeCompare(b.name));
-  const momTable = momArr.length === 0 ? '' : `
-    <div class="stats-table">
-      <div class="stats-table-title">⭐ MOM 獲得回数</div>
-      <div class="stats-table-header"><div></div><div>選手</div><div style="text-align:center">回数</div><div></div></div>
-      ${momArr.map((s, i) => `
-        <div class="stats-table-row">
-          <div class="stat-rank ${i < 3 ? medal[i] : ''}">${i + 1}</div>
-          <div class="stat-cell name">${escHtml(s.name)}</div>
-          <div class="stat-cell">${s.c}</div>
-          <div></div>
-        </div>`).join('')}
-    </div>`;
-
-  document.getElementById('agg-result').innerHTML = `
-    <div style="margin-bottom:14px;"><div style="font-size:13px;color:var(--text-muted);">${selected.length}試合を集計</div></div>
-    ${summary}${scorerTable}${momTable}`;
+  if (team) { result.innerHTML = aggTeamHtml(matches, team, comp); return; }
+  result.innerHTML = aggOverallHtml(matches, comp);
 }
 
-// ===== フォーメーション（eフットボール風 ドラッグ＆ドロップ） =====
+// チーム別スタッツ
+function aggTeamHtml(matches, team, comp) {
+  let gp = 0, w = 0, d = 0, l = 0, gf = 0, ga = 0, ratingSum = 0, ratingCnt = 0;
+  const scorers = {};
+  matches.forEach(m => {
+    const side = m.homeTeam === team ? 'home' : 'away';
+    const ts = goalCount(m, side), os = goalCount(m, side === 'home' ? 'away' : 'home');
+    gp++; gf += ts; ga += os;
+    if (m.finished) { if (ts > os) w++; else if (os > ts) l++; else d++; }
+    (m.events || []).forEach(e => { if (e.type === 'goal' && e.side === side && e.player) scorers[e.player] = (scorers[e.player] || 0) + 1; });
+    if (m.rating) { ratingSum += m.rating; ratingCnt++; }
+  });
+  const pts = w * 3 + d, diff = gf - ga, avg = ratingCnt ? (ratingSum / ratingCnt).toFixed(1) : '—';
+  const summary = `<div class="summary-grid">
+    <div class="summary-card"><div class="summary-value">${gp}</div><div class="summary-label">試合数</div></div>
+    <div class="summary-card"><div class="summary-value">${w}-${d}-${l}</div><div class="summary-label">勝-分-負</div></div>
+    <div class="summary-card"><div class="summary-value">${pts}</div><div class="summary-label">勝点</div></div>
+    <div class="summary-card"><div class="summary-value">${gf} / ${ga}</div><div class="summary-label">得点 / 失点</div></div>
+    <div class="summary-card"><div class="summary-value">${diff >= 0 ? '+' : ''}${diff}</div><div class="summary-label">得失点差</div></div>
+    <div class="summary-card"><div class="summary-value">${avg}</div><div class="summary-label">平均★評価</div></div>
+  </div>`;
+  const arr = Object.entries(scorers).map(([n, g]) => ({ n, g })).sort((a, b) => b.g - a.g || a.n.localeCompare(b.n));
+  const sRows = arr.length
+    ? arr.map((s, i) => `<div class="stats-table-row"><div class="stat-rank ${i < 3 ? AGG_MEDAL[i] : ''}">${i + 1}</div><div class="stat-cell name">${escHtml(s.n)}</div><div class="stat-cell">${s.g}</div><div></div></div>`).join('')
+    : `<div class="stats-table-row"><div></div><div class="stat-cell name" style="color:var(--text-muted)">得点者の記録なし</div><div></div><div></div></div>`;
+  const scorerTable = `<div class="stats-table"><div class="stats-table-title">${escHtml(team)} の得点者</div><div class="stats-table-header"><div></div><div>選手</div><div style="text-align:center">ゴール</div><div></div></div>${sRows}</div>`;
+  const matchRows = matches.slice().reverse().map(m => {
+    const side = m.homeTeam === team ? 'home' : 'away';
+    const ts = goalCount(m, side), os = goalCount(m, side === 'home' ? 'away' : 'home');
+    const res = !m.finished ? '観戦中' : (ts > os ? '勝' : (os > ts ? '負' : '分'));
+    const opp = side === 'home' ? m.awayTeam : m.homeTeam;
+    return `<div class="event-row" onclick="openMatchDetail('${m.id}')">
+        <div><div class="event-row-name">vs ${escHtml(opp)}</div><div class="event-row-date">${[formatDate(m.date), m.competition].filter(Boolean).join('　')}</div></div>
+        <div class="event-row-score">${ts} - ${os}</div>
+        <span class="event-badge ${m.finished ? '' : 'ongoing'}">${res}</span>
+      </div>`;
+  }).join('');
+  return `<div style="margin-bottom:14px;"><div style="font-size:13px;color:var(--text-muted);">${escHtml(team)}${comp ? '（' + escHtml(comp) + '）' : ''} — ${gp}試合の集計</div></div>
+    ${summary}${scorerTable}
+    <div class="section-title" style="margin:6px 0 12px;">試合一覧</div><div class="event-list">${matchRows}</div>`;
+}
+
+// 全体（チーム指定なし）
+function aggOverallHtml(matches, comp) {
+  let totalGoals = 0, yellow = 0, red = 0, ratingSum = 0, ratingCnt = 0;
+  const scorers = {}, moms = {};
+  matches.forEach(m => {
+    (m.events || []).forEach(e => {
+      if (e.type === 'goal') { totalGoals++; if (e.player) { scorers[e.player] = scorers[e.player] || { g: 0, set: new Set() }; scorers[e.player].g++; scorers[e.player].set.add(m.id); } }
+      else if (e.type === 'yellow') yellow++;
+      else if (e.type === 'red') red++;
+    });
+    if (m.rating) { ratingSum += m.rating; ratingCnt++; }
+    if (m.mom) moms[m.mom] = (moms[m.mom] || 0) + 1;
+  });
+  const avgGoals = (totalGoals / matches.length).toFixed(1);
+  const avgRating = ratingCnt ? (ratingSum / ratingCnt).toFixed(1) : '—';
+  const summary = `<div class="summary-grid">
+    <div class="summary-card"><div class="summary-value">${matches.length}</div><div class="summary-label">観戦試合数</div></div>
+    <div class="summary-card"><div class="summary-value">${totalGoals}</div><div class="summary-label">総ゴール数</div></div>
+    <div class="summary-card"><div class="summary-value">${avgGoals}</div><div class="summary-label">平均ゴール / 試合</div></div>
+    <div class="summary-card"><div class="summary-value">${avgRating}</div><div class="summary-label">平均★評価</div></div>
+    <div class="summary-card"><div class="summary-value">${yellow}</div><div class="summary-label">警告（イエロー）</div></div>
+    <div class="summary-card"><div class="summary-value">${red}</div><div class="summary-label">退場（レッド）</div></div>
+  </div>`;
+  const sArr = Object.entries(scorers).map(([n, s]) => ({ n, g: s.g, games: s.set.size })).sort((a, b) => b.g - a.g || a.n.localeCompare(b.n));
+  const sRows = sArr.length
+    ? sArr.map((s, i) => `<div class="stats-table-row"><div class="stat-rank ${i < 3 ? AGG_MEDAL[i] : ''}">${i + 1}</div><div class="stat-cell name">${escHtml(s.n)}</div><div class="stat-cell">${s.g}</div><div class="stat-cell sub">${s.games}試合</div></div>`).join('')
+    : `<div class="stats-table-row"><div></div><div class="stat-cell name" style="color:var(--text-muted)">得点者の記録なし</div><div></div><div></div></div>`;
+  const scorerTable = `<div class="stats-table"><div class="stats-table-title">得点者ランキング</div><div class="stats-table-header"><div></div><div>選手</div><div style="text-align:center">ゴール</div><div style="text-align:center">出場試合</div></div>${sRows}</div>`;
+  const mArr = Object.entries(moms).map(([n, c]) => ({ n, c })).sort((a, b) => b.c - a.c || a.n.localeCompare(b.n));
+  const momTable = mArr.length ? `<div class="stats-table"><div class="stats-table-title">MOM 獲得回数</div><div class="stats-table-header"><div></div><div>選手</div><div style="text-align:center">回数</div><div></div></div>${mArr.map((s, i) => `<div class="stats-table-row"><div class="stat-rank ${i < 3 ? AGG_MEDAL[i] : ''}">${i + 1}</div><div class="stat-cell name">${escHtml(s.n)}</div><div class="stat-cell">${s.c}</div><div></div></div>`).join('')}</div>` : '';
+  return `<div style="margin-bottom:14px;"><div style="font-size:13px;color:var(--text-muted);">${comp ? escHtml(comp) : 'すべての大会'} — ${matches.length}試合を集計</div></div>${summary}${scorerTable}${momTable}`;
+}
+
+// ===== フォーメーション（チーム名で管理・TEAM選手連携・自由配置・PNG/PDF出力） =====
 const FORMATIONS = {
-  '4-4-2': [
-    {pos:'GK', x:50, y:90},
-    {pos:'LB', x:16, y:70}, {pos:'CB', x:38, y:74}, {pos:'CB', x:62, y:74}, {pos:'RB', x:84, y:70},
-    {pos:'LM', x:16, y:44}, {pos:'CM', x:38, y:48}, {pos:'CM', x:62, y:48}, {pos:'RM', x:84, y:44},
-    {pos:'ST', x:38, y:18}, {pos:'ST', x:62, y:18},
-  ],
   '4-3-3': [
     {pos:'GK', x:50, y:90},
     {pos:'LB', x:16, y:70}, {pos:'CB', x:38, y:74}, {pos:'CB', x:62, y:74}, {pos:'RB', x:84, y:70},
@@ -629,6 +723,25 @@ const FORMATIONS = {
     {pos:'LM', x:20, y:37}, {pos:'AM', x:50, y:34}, {pos:'RM', x:80, y:37},
     {pos:'ST', x:50, y:15},
   ],
+  '3-4-2-1': [
+    {pos:'GK', x:50, y:90},
+    {pos:'CB', x:28, y:74}, {pos:'CB', x:50, y:76}, {pos:'CB', x:72, y:74},
+    {pos:'LM', x:15, y:52}, {pos:'CM', x:38, y:54}, {pos:'CM', x:62, y:54}, {pos:'RM', x:85, y:52},
+    {pos:'AM', x:35, y:32}, {pos:'AM', x:65, y:32},
+    {pos:'ST', x:50, y:16},
+  ],
+  '4-4-2': [
+    {pos:'GK', x:50, y:90},
+    {pos:'LB', x:16, y:70}, {pos:'CB', x:38, y:74}, {pos:'CB', x:62, y:74}, {pos:'RB', x:84, y:70},
+    {pos:'LM', x:16, y:44}, {pos:'CM', x:38, y:48}, {pos:'CM', x:62, y:48}, {pos:'RM', x:84, y:44},
+    {pos:'ST', x:38, y:18}, {pos:'ST', x:62, y:18},
+  ],
+  '5-4-1': [
+    {pos:'GK', x:50, y:90},
+    {pos:'LB', x:12, y:72}, {pos:'CB', x:31, y:76}, {pos:'CB', x:50, y:78}, {pos:'CB', x:69, y:76}, {pos:'RB', x:88, y:72},
+    {pos:'LM', x:16, y:48}, {pos:'CM', x:38, y:50}, {pos:'CM', x:62, y:50}, {pos:'RM', x:84, y:48},
+    {pos:'ST', x:50, y:18},
+  ],
   '3-5-2': [
     {pos:'GK', x:50, y:90},
     {pos:'CB', x:30, y:74}, {pos:'CB', x:50, y:76}, {pos:'CB', x:70, y:74},
@@ -641,67 +754,126 @@ const FORMATIONS = {
     {pos:'LM', x:16, y:48}, {pos:'CM', x:38, y:50}, {pos:'CM', x:62, y:50}, {pos:'RM', x:84, y:48},
     {pos:'LW', x:22, y:20}, {pos:'ST', x:50, y:16}, {pos:'RW', x:78, y:20},
   ],
+  '5-3-2': [
+    {pos:'GK', x:50, y:90},
+    {pos:'LB', x:12, y:72}, {pos:'CB', x:31, y:76}, {pos:'CB', x:50, y:78}, {pos:'CB', x:69, y:76}, {pos:'RB', x:88, y:72},
+    {pos:'CM', x:28, y:50}, {pos:'CM', x:50, y:52}, {pos:'CM', x:72, y:50},
+    {pos:'ST', x:38, y:20}, {pos:'ST', x:62, y:20},
+  ],
 };
+const PRESET_ORDER = ['4-3-3','4-2-3-1','3-4-2-1','4-4-2','5-4-1','3-5-2','3-4-3','5-3-2'];
 const DEFAULT_PRESET = '4-4-2';
 
+// チーム名をキーに保存：{ [teamName]: { preset, layout, assignments } }
 const FDB = {
-  get list() { try { return JSON.parse(localStorage.getItem('swm_formations') || '[]'); } catch { return []; } },
-  saveList(v) { localStorage.setItem('swm_formations', JSON.stringify(v)); },
-  get current() { try { return JSON.parse(localStorage.getItem('swm_formation_current')); } catch { return null; } },
-  saveCurrent(v) { localStorage.setItem('swm_formation_current', JSON.stringify(v)); },
+  get all() { try { const v = JSON.parse(localStorage.getItem('swm_formations')); return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {}; } catch { return {}; } },
+  saveAll(v) { localStorage.setItem('swm_formations', JSON.stringify(v)); },
+  get(team) { return this.all[team] || null; },
+  set(team, f) { const a = this.all; a[team] = f; this.saveAll(a); },
+  remove(team) { const a = this.all; delete a[team]; this.saveAll(a); },
 };
 
-function blankFormation() {
-  return { id: null, name: '', preset: DEFAULT_PRESET, team: '', assignments: {}, roster: [] };
+// 編集中の状態
+let fmTeam = '';
+let fmPreset = DEFAULT_PRESET;
+let fmLayout = null;   // 'custom'時の座標 [{pos,x,y}]、それ以外は null
+let fmAssign = {};     // slotIndex -> 選手名
+let fmDrag = null;     // 選手のドラッグ
+let fmSlotDrag = null; // スロット位置のドラッグ（カスタム）
+
+function fmCurSlots() {
+  if (fmPreset === 'custom' && Array.isArray(fmLayout)) return fmLayout;
+  return FORMATIONS[fmPreset] || FORMATIONS[DEFAULT_PRESET];
 }
-let currentFormation = blankFormation();
-let fmDrag = null;
+function fmSquadOf(team) {
+  if (!team) return [];
+  for (const g of TEAMDB.data.groups) {
+    const t = g.teams.find(x => x.name === team);
+    if (t && t.squad) return [...(t.squad.GK||[]), ...(t.squad.DF||[]), ...(t.squad.MF||[]), ...(t.squad.FW||[])];
+  }
+  return [];
+}
+function fmAssignedNames() { return new Set(Object.values(fmAssign)); }
 
 function openFormationScreen() {
-  const saved = FDB.current;
-  currentFormation = (saved && saved.preset && FORMATIONS[saved.preset]) ? saved : blankFormation();
-  if (!currentFormation.assignments) currentFormation.assignments = {};
-  if (!currentFormation.roster) currentFormation.roster = [];
-  document.getElementById('fm-name').value   = currentFormation.name || '';
-  document.getElementById('fm-team').value   = currentFormation.team || '';
-  document.getElementById('fm-preset').value = currentFormation.preset || DEFAULT_PRESET;
+  TEAMDB.ensureSeed();
+  fmMatchCtx = null;
+  let cur = null;
+  try { cur = JSON.parse(localStorage.getItem('swm_formation_current')); } catch {}
+  if (cur && cur.team !== undefined) {
+    fmTeam = cur.team || ''; fmPreset = cur.preset || DEFAULT_PRESET; fmLayout = cur.layout || null; fmAssign = cur.assignments || {};
+  } else { fmTeam = ''; fmPreset = DEFAULT_PRESET; fmLayout = null; fmAssign = {}; }
+  refreshDatalists();
+  document.getElementById('fm-team').value = fmTeam;
+  document.getElementById('fm-preset').value = fmPreset;
+  fmUpdateMatchBanner();
   renderFormation();
   renderSavedFormations();
   showScreen('formation');
 }
 
-function persistCurrent() { FDB.saveCurrent(currentFormation); }
-function assignedNames() { return new Set(Object.values(currentFormation.assignments)); }
+function fmPersist() {
+  localStorage.setItem('swm_formation_current', JSON.stringify({ team: fmTeam, preset: fmPreset, layout: fmLayout, assignments: fmAssign }));
+}
+
+function fmSelectTeam() {
+  fmTeam = document.getElementById('fm-team').value.trim();
+  const saved = FDB.get(fmTeam);
+  if (saved) { fmPreset = saved.preset || DEFAULT_PRESET; fmLayout = saved.layout || null; fmAssign = Object.assign({}, saved.assignments); }
+  else { fmPreset = DEFAULT_PRESET; fmLayout = null; fmAssign = {}; }
+  document.getElementById('fm-preset').value = fmPreset;
+  fmPersist(); renderFormation(); renderSavedFormations();
+}
 
 function renderFormation() {
-  const slots = FORMATIONS[currentFormation.preset] || FORMATIONS[DEFAULT_PRESET];
+  const slots = fmCurSlots();
+  const isCustom = fmPreset === 'custom';
   const pitch = document.getElementById('fm-pitch-slots');
   pitch.innerHTML = slots.map((s, i) => {
-    const name = currentFormation.assignments[i];
+    const name = fmAssign[i];
+    const mv = isCustom ? ' fm-slot-movable' : '';
     if (name) {
-      return `<div class="fm-slot filled" data-slot="${i}" style="left:${s.x}%;top:${s.y}%">
+      return `<div class="fm-slot filled${mv}" data-slot="${i}" style="left:${s.x}%;top:${s.y}%">
                 <button class="fm-slot-x" onclick="event.stopPropagation();fmUnassign(${i})" title="外す">×</button>
                 <div class="fm-slot-dot">${escHtml(s.pos)}</div>
                 <div class="fm-slot-name">${escHtml(name)}</div>
               </div>`;
     }
-    return `<div class="fm-slot empty" data-slot="${i}" style="left:${s.x}%;top:${s.y}%">
+    return `<div class="fm-slot empty${mv}" data-slot="${i}" style="left:${s.x}%;top:${s.y}%">
               <div class="fm-slot-dot">${escHtml(s.pos)}</div>
             </div>`;
   }).join('');
 
-  const assigned = assignedNames();
-  const bench = currentFormation.roster.filter(n => !assigned.has(n));
+  const squad = fmSquadOf(fmTeam);
   const benchEl = document.getElementById('fm-bench');
-  benchEl.innerHTML = bench.length
-    ? bench.map(n => `<div class="fm-chip" data-drag="bench" data-name="${escHtml(n)}">
-          <span>${escHtml(n)}</span>
-          <button class="fm-chip-x" data-name="${escHtml(n)}" onclick="fmDeletePlayer(event)" title="削除">×</button>
-        </div>`).join('')
-    : `<div class="fm-bench-empty">控え選手はいません（全員配置済み、または未追加）</div>`;
+  if (!fmTeam) {
+    benchEl.innerHTML = `<div class="fm-bench-empty">上の「チーム」を選ぶと選手が並びます</div>`;
+  } else if (squad.length === 0) {
+    benchEl.innerHTML = `<div class="fm-bench-empty">「${escHtml(fmTeam)}」の選手が未登録です。Teamタブで登録してください</div>`;
+  } else {
+    const assigned = fmAssignedNames();
+    const bench = squad.filter(n => !assigned.has(n));
+    benchEl.innerHTML = bench.length
+      ? bench.map(n => `<div class="fm-chip" data-drag="bench" data-name="${escHtml(n)}">${escHtml(n)}</div>`).join('')
+      : `<div class="fm-bench-empty">全員配置済み</div>`;
+  }
+  document.getElementById('fm-custom-hint').style.display = isCustom ? '' : 'none';
 }
 
-// ドラッグ＆ドロップ（Pointer Events：マウス・タッチ・ペン共通でiPad対応）
+function fmChangePreset() {
+  const val = document.getElementById('fm-preset').value;
+  if (val === 'custom') {
+    const base = (fmPreset === 'custom' && Array.isArray(fmLayout)) ? fmLayout : fmCurSlots();
+    fmLayout = base.map(s => ({ pos: s.pos, x: s.x, y: s.y }));
+    fmPreset = 'custom';
+  } else {
+    fmPreset = val; fmLayout = null;
+  }
+  fmPersist();
+  renderFormation();
+}
+
+// ---- ドラッグ＆ドロップ（Pointer Events：マウス・タッチ共通） ----
 function fmElToTarget(el) {
   if (!el) return null;
   const slot = el.closest('.fm-slot');
@@ -710,7 +882,6 @@ function fmElToTarget(el) {
   if (bench) return { type: 'bench', el: bench };
   return null;
 }
-
 function fmClearHints() {
   document.querySelectorAll('.fm-drop-hint').forEach(el => el.classList.remove('fm-drop-hint'));
   document.getElementById('fm-bench')?.classList.remove('fm-bench-over');
@@ -718,12 +889,29 @@ function fmClearHints() {
 
 function fmPointerDown(e) {
   if (e.pointerType === 'mouse' && e.button !== 0) return;
-  if (e.target.closest('.fm-chip-x, .fm-slot-x')) return; // ×ボタンはタップ動作を優先
+  if (e.target.closest('.fm-slot-x')) return; // ×ボタンはタップ動作を優先
+
+  // カスタム：スロットの位置をドラッグで移動
+  if (fmPreset === 'custom') {
+    const slotEl = e.target.closest('.fm-slot');
+    if (slotEl && slotEl.dataset.slot !== undefined) {
+      e.preventDefault();
+      const rect = document.getElementById('fm-pitch').getBoundingClientRect();
+      fmSlotDrag = { i: +slotEl.dataset.slot, el: slotEl, rect, pointerId: e.pointerId };
+      try { slotEl.setPointerCapture(e.pointerId); } catch {}
+      document.addEventListener('pointermove', fmSlotMove);
+      document.addEventListener('pointerup', fmSlotUp);
+      document.addEventListener('pointercancel', fmSlotUp);
+      return;
+    }
+  }
+
+  // 通常：選手のドラッグ（控え→枠、枠↔枠）
   const chip = e.target.closest('.fm-chip');
   const slot = e.target.closest('.fm-slot.filled');
   let info = null;
   if (chip) info = { from: 'bench', name: chip.dataset.name, srcEl: chip };
-  else if (slot) { const i = +slot.dataset.slot; info = { from: 'slot', slotIndex: i, name: currentFormation.assignments[i], srcEl: slot }; }
+  else if (slot) { const i = +slot.dataset.slot; info = { from: 'slot', slotIndex: i, name: fmAssign[i], srcEl: slot }; }
   if (!info || !info.name) return;
   e.preventDefault();
   fmDrag = { ...info, pointerId: e.pointerId, moved: false, ghost: null, startX: e.clientX, startY: e.clientY };
@@ -736,7 +924,7 @@ function fmPointerDown(e) {
 function fmPointerMove(e) {
   if (!fmDrag || e.pointerId !== fmDrag.pointerId) return;
   const dx = e.clientX - fmDrag.startX, dy = e.clientY - fmDrag.startY;
-  if (!fmDrag.moved && dx * dx + dy * dy < 36) return; // 6px動いたらドラッグ開始
+  if (!fmDrag.moved && dx * dx + dy * dy < 36) return;
   fmDrag.moved = true;
   e.preventDefault();
   if (!fmDrag.ghost) {
@@ -765,11 +953,11 @@ function fmPointerUp(e) {
   if (drag.ghost) drag.ghost.remove();
   fmClearHints();
   try { drag.srcEl.releasePointerCapture(drag.pointerId); } catch {}
-  if (!drag.moved) return; // 動かなければただのタップ（誤操作防止）
+  if (!drag.moved) return;
 
   const tgt = fmElToTarget(document.elementFromPoint(e.clientX, e.clientY));
   if (!tgt) return;
-  const A = currentFormation.assignments;
+  const A = fmAssign;
   if (tgt.type === 'slot') {
     const i = tgt.index;
     if (drag.from === 'bench') {
@@ -784,125 +972,432 @@ function fmPointerUp(e) {
   } else if (tgt.type === 'bench') {
     if (drag.from === 'slot') delete A[drag.slotIndex];
   }
-  persistCurrent();
+  fmPersist();
   renderFormation();
 }
 
-function fmUnassign(i) {
-  delete currentFormation.assignments[i];
-  persistCurrent();
-  renderFormation();
+function fmSlotMove(e) {
+  if (!fmSlotDrag || e.pointerId !== fmSlotDrag.pointerId) return;
+  e.preventDefault();
+  const r = fmSlotDrag.rect;
+  let x = (e.clientX - r.left) / r.width * 100;
+  let y = (e.clientY - r.top) / r.height * 100;
+  x = Math.max(4, Math.min(96, x)); y = Math.max(4, Math.min(96, y));
+  fmLayout[fmSlotDrag.i].x = Math.round(x * 10) / 10;
+  fmLayout[fmSlotDrag.i].y = Math.round(y * 10) / 10;
+  fmSlotDrag.el.style.left = x + '%';
+  fmSlotDrag.el.style.top = y + '%';
+}
+function fmSlotUp(e) {
+  if (!fmSlotDrag || e.pointerId !== fmSlotDrag.pointerId) return;
+  document.removeEventListener('pointermove', fmSlotMove);
+  document.removeEventListener('pointerup', fmSlotUp);
+  document.removeEventListener('pointercancel', fmSlotUp);
+  try { fmSlotDrag.el.releasePointerCapture(fmSlotDrag.pointerId); } catch {}
+  fmSlotDrag = null;
+  fmPersist();
 }
 
-function fmAddPlayer() {
-  const input = document.getElementById('fm-player-input');
-  const name = input.value.trim();
-  if (!name) { showToast('選手名を入力してください'); return; }
-  if (currentFormation.roster.includes(name)) { showToast('同じ選手がいます'); return; }
-  currentFormation.roster.push(name);
-  input.value = '';
-  input.focus();
-  persistCurrent();
-  renderFormation();
-}
-
-function fmDeletePlayer(e) {
-  e.stopPropagation();
-  const name = e.currentTarget.dataset.name;
-  currentFormation.roster = currentFormation.roster.filter(n => n !== name);
-  Object.keys(currentFormation.assignments).forEach(k => {
-    if (currentFormation.assignments[k] === name) delete currentFormation.assignments[k];
-  });
-  persistCurrent();
-  renderFormation();
-}
-
-function fmChangePreset() {
-  const val = document.getElementById('fm-preset').value;
-  currentFormation.preset = val;
-  const len = FORMATIONS[val].length;
-  Object.keys(currentFormation.assignments).forEach(k => { if (+k >= len) delete currentFormation.assignments[k]; });
-  persistCurrent();
-  renderFormation();
-}
+function fmUnassign(i) { delete fmAssign[i]; fmPersist(); renderFormation(); }
 
 function saveFormation() {
-  const name = document.getElementById('fm-name').value.trim();
-  if (!name) { showToast('フォーメーション名を入力してください'); return; }
-  currentFormation.name = name;
-  currentFormation.team = document.getElementById('fm-team').value.trim();
-  const list = FDB.list;
-  if (!currentFormation.id) currentFormation.id = uuid();
-  const copy = JSON.parse(JSON.stringify(currentFormation));
-  const idx = list.findIndex(f => f.id === currentFormation.id);
-  if (idx >= 0) list[idx] = copy; else list.push(copy);
-  FDB.saveList(list);
-  persistCurrent();
+  if (fmMatchCtx) {
+    const matches = DB.matches;
+    const m = matches.find(x => x.id === fmMatchCtx.matchId);
+    if (!m) { showToast('試合が見つかりません'); return; }
+    if (!m.lineups) m.lineups = {};
+    m.lineups[fmMatchCtx.side] = JSON.parse(JSON.stringify({ preset: fmPreset, layout: fmLayout, assignments: fmAssign }));
+    DB.saveMatches(matches);
+    showToast('この試合の布陣を保存しました（プリセットは変更なし）');
+    return;
+  }
+  if (!fmTeam) { showToast('チームを選択してください'); return; }
+  FDB.set(fmTeam, { preset: fmPreset, layout: fmLayout, assignments: fmAssign });
+  fmPersist();
   renderSavedFormations();
-  showToast(`「${name}」を保存しました`);
+  showToast(`「${fmTeam}」のフォーメーションを保存しました`);
 }
 
-function newFormation() {
-  currentFormation = blankFormation();
-  document.getElementById('fm-name').value   = '';
-  document.getElementById('fm-team').value   = '';
-  document.getElementById('fm-preset').value = DEFAULT_PRESET;
-  persistCurrent();
-  renderFormation();
-  renderSavedFormations();
+function renderSavedFormations() {
+  const all = FDB.all;
+  const teams = Object.keys(all);
+  const el = document.getElementById('fm-saved-list');
+  if (!teams.length) { el.innerHTML = `<div class="fm-saved-empty">保存済みフォーメーションはありません</div>`; return; }
+  el.innerHTML = teams.map(tn => {
+    const f = all[tn];
+    const cnt = Object.keys(f.assignments || {}).length;
+    const active = tn === fmTeam ? ' active' : '';
+    const pl = f.preset === 'custom' ? 'カスタム' : (f.preset || '');
+    return `<div class="fm-saved-item${active}" data-team="${escHtml(tn)}" onclick="fmLoadSaved(event)">
+        <div class="fm-saved-main">
+          <div class="fm-saved-name">${escHtml(tn)}</div>
+          <div class="fm-saved-sub">${escHtml(pl)}・${cnt}/11人</div>
+        </div>
+        <button class="fm-saved-x" data-team="${escHtml(tn)}" onclick="event.stopPropagation();fmDeleteSaved(event)" title="削除">×</button>
+      </div>`;
+  }).join('');
 }
-
-function loadFormation(id) {
-  const f = FDB.list.find(x => x.id === id);
-  if (!f) return;
-  currentFormation = JSON.parse(JSON.stringify(f));
-  if (!currentFormation.assignments) currentFormation.assignments = {};
-  if (!currentFormation.roster) currentFormation.roster = [];
-  document.getElementById('fm-name').value   = currentFormation.name || '';
-  document.getElementById('fm-team').value   = currentFormation.team || '';
-  document.getElementById('fm-preset').value = currentFormation.preset || DEFAULT_PRESET;
-  persistCurrent();
-  renderFormation();
-  renderSavedFormations();
-  showToast(`「${f.name}」を読み込みました`);
+function fmLoadSaved(e) {
+  const team = e.currentTarget.dataset.team;
+  document.getElementById('fm-team').value = team;
+  fmSelectTeam();
 }
-
-async function deleteFormation(id) {
-  const f = FDB.list.find(x => x.id === id);
-  if (!f) return;
-  const ok = await showDialog('フォーメーションを削除', `「${f.name}」を削除しますか？`);
+async function fmDeleteSaved(e) {
+  const team = e.currentTarget.dataset.team;
+  const ok = await showDialog('削除', `「${team}」の保存フォーメーションを削除しますか？`);
   if (!ok) return;
-  FDB.saveList(FDB.list.filter(x => x.id !== id));
-  if (currentFormation.id === id) { currentFormation.id = null; persistCurrent(); }
+  FDB.remove(team);
   renderSavedFormations();
   showToast('削除しました');
 }
 
-function renderSavedFormations() {
-  const list = FDB.list;
-  const el = document.getElementById('fm-saved-list');
-  if (!list.length) { el.innerHTML = `<div class="fm-saved-empty">保存済みフォーメーションはありません</div>`; return; }
-  el.innerHTML = list.map(f => {
-    const count = Object.keys(f.assignments || {}).length;
-    const active = f.id === currentFormation.id ? ' active' : '';
-    return `<div class="fm-saved-item${active}" onclick="loadFormation('${f.id}')">
-        <div class="fm-saved-main">
-          <div class="fm-saved-name">${escHtml(f.name)}</div>
-          <div class="fm-saved-sub">${escHtml(f.preset)}${f.team ? '・' + escHtml(f.team) : ''}・${count}/11人</div>
+// ---- PNG / PDF 出力 ----
+function fmRenderCanvas(opts) {
+  opts = opts || {};
+  const team   = opts.team !== undefined ? opts.team : fmTeam;
+  const preset = opts.preset !== undefined ? opts.preset : fmPreset;
+  const layout = opts.layout !== undefined ? opts.layout : fmLayout;
+  const assign = opts.assignments !== undefined ? opts.assignments : fmAssign;
+  const slots = (preset === 'custom' && Array.isArray(layout)) ? layout : (FORMATIONS[preset] || FORMATIONS[DEFAULT_PRESET]);
+  const W = 620, H = 920;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  for (let i = 0; i < 12; i++) { ctx.fillStyle = i % 2 ? '#0d2659' : '#103072'; ctx.fillRect(0, H/12*i, W, H/12 + 1); }
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 2;
+  const m = 14;
+  ctx.strokeRect(m, m, W - 2*m, H - 2*m);
+  ctx.beginPath(); ctx.moveTo(m, H/2); ctx.lineTo(W - m, H/2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(W/2, H/2, 56, 0, Math.PI*2); ctx.stroke();
+  const boxW = W*0.5, boxH = H*0.11;
+  ctx.strokeRect((W - boxW)/2, m, boxW, boxH);
+  ctx.strokeRect((W - boxW)/2, H - m - boxH, boxW, boxH);
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.font = 'bold 26px sans-serif'; ctx.fillText(team || 'Formation', m + 6, m + 6);
+  ctx.font = '15px sans-serif'; ctx.fillStyle = 'rgba(255,255,255,0.75)';
+  ctx.fillText(preset === 'custom' ? 'カスタム' : preset, m + 6, m + 38);
+  slots.forEach((s, i) => {
+    const cx = s.x/100*W, cy = s.y/100*H, name = assign[i];
+    ctx.beginPath(); ctx.arc(cx, cy, 22, 0, Math.PI*2);
+    ctx.fillStyle = name ? '#1f4488' : 'rgba(255,255,255,0.12)'; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(s.pos, cx, cy);
+    if (name) {
+      ctx.font = 'bold 13px sans-serif';
+      const bw = Math.min(ctx.measureText(name).width + 12, 130), bh = 20, by = cy + 26, bx = cx - bw/2, rr = 9;
+      ctx.fillStyle = 'rgba(8,12,28,0.9)';
+      ctx.beginPath();
+      ctx.moveTo(bx+rr, by); ctx.arcTo(bx+bw, by, bx+bw, by+bh, rr); ctx.arcTo(bx+bw, by+bh, bx, by+bh, rr);
+      ctx.arcTo(bx, by+bh, bx, by, rr); ctx.arcTo(bx, by, bx+bw, by, rr); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle';
+      let disp = name;
+      while (ctx.measureText(disp).width > bw - 12 && disp.length > 1) disp = disp.slice(0, -1);
+      if (disp !== name) disp = disp.replace(/.$/, '…');
+      ctx.fillText(disp, cx, by + bh/2);
+    }
+  });
+  return canvas;
+}
+function fmExportPNG() {
+  if (!fmTeam) { showToast('チームを選択してください'); return; }
+  fmRenderCanvas().toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = (fmTeam || 'formation') + '.png'; a.click();
+    URL.revokeObjectURL(url);
+  });
+  showToast('PNGを書き出しました');
+}
+function fmExportPDF() {
+  if (!fmTeam) { showToast('チームを選択してください'); return; }
+  const JsPDF = window.jspdf && window.jspdf.jsPDF;
+  if (!JsPDF) { showToast('PDF機能の準備中です。少し待って再度お試しください'); return; }
+  const canvas = fmRenderCanvas();
+  const img = canvas.toDataURL('image/png');
+  const pdf = new JsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+  const pw = pdf.internal.pageSize.getWidth();
+  const margin = 36, iw = pw - margin*2, ih = iw * (canvas.height / canvas.width);
+  pdf.addImage(img, 'PNG', margin, margin, iw, ih);
+  pdf.save((fmTeam || 'formation') + '.pdf');
+  showToast('PDFを書き出しました');
+}
+
+// ===== 試合の布陣（交代で反映・クイックアクセス・試合モード編集） =====
+function ensureLineup(m, side) {
+  if (!m.lineups) m.lineups = {};
+  if (!m.lineups[side]) {
+    const teamName = side === 'home' ? m.homeTeam : m.awayTeam;
+    const preset = (typeof FDB !== 'undefined') ? FDB.get(teamName) : null;
+    m.lineups[side] = preset
+      ? JSON.parse(JSON.stringify({ preset: preset.preset || DEFAULT_PRESET, layout: preset.layout || null, assignments: preset.assignments || {} }))
+      : { preset: DEFAULT_PRESET, layout: null, assignments: {} };
+  }
+  return m.lineups[side];
+}
+function applySub(m, ev) {
+  if (ev.type !== 'sub' || !ev.player || !ev.playerIn) return;
+  const L = ensureLineup(m, ev.side);
+  const idx = Object.keys(L.assignments).find(k => L.assignments[k] === ev.player);
+  if (idx !== undefined) L.assignments[idx] = ev.playerIn;
+}
+
+let currentLineupSide = 'home';
+function openLineup(side) {
+  const matches = DB.matches;
+  const m = matches.find(x => x.id === currentMatchId);
+  if (!m) return;
+  currentLineupSide = side || 'home';
+  ensureLineup(m, 'home'); ensureLineup(m, 'away');
+  DB.saveMatches(matches);
+  renderLineupView();
+  document.getElementById('lineup-modal').classList.remove('hidden');
+}
+function setLineupSide(side) { currentLineupSide = side; renderLineupView(); }
+function renderLineupView() {
+  const m = DB.matches.find(x => x.id === currentMatchId);
+  if (!m) return;
+  const side = currentLineupSide;
+  const teamName = side === 'home' ? m.homeTeam : m.awayTeam;
+  const L = ensureLineup(m, side);
+  document.getElementById('lineup-side-home').classList.toggle('active', side === 'home');
+  document.getElementById('lineup-side-away').classList.toggle('active', side === 'away');
+  document.getElementById('lineup-title').textContent = `布陣：${teamName || (side === 'home' ? 'ホーム' : 'アウェイ')}`;
+  const canvas = fmRenderCanvas({ team: teamName, preset: L.preset, layout: L.layout, assignments: L.assignments });
+  const wrap = document.getElementById('lineup-canvas-wrap');
+  wrap.innerHTML = '';
+  wrap.appendChild(canvas);
+}
+function closeLineup() { document.getElementById('lineup-modal').classList.add('hidden'); }
+function editMatchLineup() { closeLineup(); openMatchFormationEdit(currentMatchId, currentLineupSide); }
+
+// フォーメーション画面を「試合モード」で開く（保存先＝試合の布陣コピー。プリセットは不変）
+let fmMatchCtx = null;
+function openMatchFormationEdit(matchId, side) {
+  const m = DB.matches.find(x => x.id === matchId);
+  if (!m) return;
+  const L = ensureLineup(m, side);
+  fmMatchCtx = { matchId, side };
+  fmTeam = side === 'home' ? m.homeTeam : m.awayTeam;
+  fmPreset = L.preset || DEFAULT_PRESET;
+  fmLayout = L.layout || null;
+  fmAssign = Object.assign({}, L.assignments);
+  document.getElementById('fm-team').value = fmTeam;
+  document.getElementById('fm-preset').value = fmPreset;
+  fmUpdateMatchBanner();
+  renderFormation();
+  renderSavedFormations();
+  showScreen('formation');
+}
+function fmUpdateMatchBanner() {
+  const banner = document.getElementById('fm-match-banner');
+  const teamInput = document.getElementById('fm-team');
+  const savedWrap = document.getElementById('fm-saved-wrap');
+  if (fmMatchCtx) {
+    const sideLabel = fmMatchCtx.side === 'home' ? 'ホーム' : 'アウェイ';
+    banner.innerHTML = `<div>この試合の布陣を編集中：<strong>${escHtml(fmTeam)}</strong>（${sideLabel}）— 保存しても保存済みプリセットは変わりません</div>
+      <button class="btn btn-secondary" onclick="fmBackToMatch()">← 試合に戻る</button>`;
+    banner.style.display = '';
+    teamInput.disabled = true;
+    if (savedWrap) savedWrap.style.display = 'none';
+  } else {
+    banner.style.display = 'none';
+    teamInput.disabled = false;
+    if (savedWrap) savedWrap.style.display = '';
+  }
+}
+function fmBackToMatch() {
+  const mid = fmMatchCtx && fmMatchCtx.matchId;
+  fmMatchCtx = null;
+  fmUpdateMatchBanner();
+  if (mid) openLiveScreen(mid); else initHome();
+}
+
+// ===== TEAM（グループ→チーム→選手） =====
+const TEAMDB = {
+  ensureSeed() {
+    if (!localStorage.getItem('swm_teams') && window.WC_TEAMS_DATA) {
+      localStorage.setItem('swm_teams', JSON.stringify(window.WC_TEAMS_DATA));
+    }
+  },
+  get data() {
+    try { return JSON.parse(localStorage.getItem('swm_teams')) || { groups: [] }; } catch { return { groups: [] }; }
+  },
+  save(d) { localStorage.setItem('swm_teams', JSON.stringify(d)); },
+  reset() { if (window.WC_TEAMS_DATA) this.save(JSON.parse(JSON.stringify(window.WC_TEAMS_DATA))); },
+  allTeamNames() { const n = []; this.data.groups.forEach(g => g.teams.forEach(t => n.push(t.name))); return n; },
+};
+
+let teamView = null; // null=チーム一覧, {gi,ti}=選手一覧（チーム詳細）
+
+function openTeamScreen() {
+  TEAMDB.ensureSeed();
+  teamView = null;
+  renderTeam();
+  showScreen('team');
+}
+
+function squadCount(t) {
+  const s = t.squad || {};
+  return (s.GK||[]).length + (s.DF||[]).length + (s.MF||[]).length + (s.FW||[]).length;
+}
+
+function renderTeam() { if (teamView) renderTeamDetail(); else renderTeamList(); }
+
+function renderTeamList() {
+  const d = TEAMDB.data;
+  document.getElementById('team-title').textContent = 'チーム';
+  document.getElementById('team-sub').textContent = 'フォルダ → チーム → 選手（チームをタップで選手一覧）';
+  document.getElementById('team-header-actions').innerHTML =
+    `<button class="btn btn-primary" onclick="openTeamAdd()">＋ 追加</button>
+     <button class="btn btn-ghost" onclick="teamResetDefault()">初期データに戻す</button>`;
+  const groupsHtml = d.groups.map((g, gi) => `
+    <div class="team-group">
+      <div class="team-group-head">
+        <span>グループ ${escHtml(g.id)}</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="tg-count">${g.teams.length}チーム</span>
+          <button class="tg-del" onclick="teamDeleteGroup(${gi})" title="フォルダ削除">×</button>
         </div>
-        <button class="fm-saved-x" onclick="event.stopPropagation();deleteFormation('${f.id}')" title="削除">×</button>
+      </div>
+      <div class="team-chip-list">
+        ${g.teams.map((t, ti) => `
+          <button class="team-chip-btn" onclick="openTeamDetail(${gi},${ti})">
+            <span class="tcb-name">${escHtml(t.name)}</span>
+            <span class="tcb-count">${squadCount(t)}名</span>
+            <span class="tcb-del" onclick="event.stopPropagation();teamDeleteTeam(${gi},${ti})" title="削除">×</span>
+          </button>`).join('') || '<span class="team-empty">チーム未登録（右上の＋から追加）</span>'}
+      </div>
+    </div>`).join('');
+  document.getElementById('team-content').innerHTML =
+    `<div class="team-groups">${groupsHtml || '<div class="empty-state">フォルダがありません。右上の＋から追加してください。</div>'}</div>`;
+}
+
+// ＋追加（フォルダ／チームを選択）
+let teamAddMode = 'folder';
+function openTeamAdd() {
+  teamAddSetMode('folder');
+  document.getElementById('tam-folder-name').value = '';
+  document.getElementById('tam-team-name').value = '';
+  document.getElementById('tam-team-folder').innerHTML =
+    TEAMDB.data.groups.map((g, gi) => `<option value="${gi}">グループ ${escHtml(g.id)}</option>`).join('');
+  document.getElementById('team-add-modal').classList.remove('hidden');
+}
+function closeTeamAdd() { document.getElementById('team-add-modal').classList.add('hidden'); }
+function teamAddSetMode(mode) {
+  teamAddMode = mode;
+  document.getElementById('tam-mode-folder').classList.toggle('active', mode === 'folder');
+  document.getElementById('tam-mode-team').classList.toggle('active', mode === 'team');
+  document.getElementById('tam-folder-fields').style.display = mode === 'folder' ? '' : 'none';
+  document.getElementById('tam-team-fields').style.display = mode === 'team' ? '' : 'none';
+}
+function doTeamAdd() {
+  const d = TEAMDB.data;
+  if (teamAddMode === 'folder') {
+    const id = document.getElementById('tam-folder-name').value.trim();
+    if (!id) { showToast('フォルダ名を入力してください'); return; }
+    if (d.groups.some(g => g.id === id)) { showToast('同じフォルダがあります'); return; }
+    d.groups.push({ id, teams: [] });
+    TEAMDB.save(d); closeTeamAdd(); renderTeam(); showToast(`フォルダ「${id}」を作成しました`);
+  } else {
+    const gi = parseInt(document.getElementById('tam-team-folder').value, 10);
+    const name = document.getElementById('tam-team-name').value.trim();
+    if (isNaN(gi) || !d.groups[gi]) { showToast('フォルダを選んでください'); return; }
+    if (!name) { showToast('チーム名を入力してください'); return; }
+    if (d.groups[gi].teams.some(t => t.name === name)) { showToast('同じチームがあります'); return; }
+    d.groups[gi].teams.push({ name, squad: { GK:[], DF:[], MF:[], FW:[] } });
+    TEAMDB.save(d); closeTeamAdd(); renderTeam(); showToast(`「${name}」を追加しました`);
+  }
+}
+
+function renderTeamDetail() {
+  const d = TEAMDB.data;
+  const g = d.groups[teamView.gi]; if (!g) { teamView = null; return renderTeamList(); }
+  const t = g.teams[teamView.ti]; if (!t) { teamView = null; return renderTeamList(); }
+  if (!t.squad) t.squad = { GK:[], DF:[], MF:[], FW:[] };
+  document.getElementById('team-title').textContent = t.name;
+  document.getElementById('team-sub').textContent = `グループ ${escHtml(g.id)}・${squadCount(t)}名`;
+  document.getElementById('team-header-actions').innerHTML =
+    `<button class="btn btn-secondary" onclick="backToTeamList()">← 一覧へ</button>`;
+  const sections = ['GK','DF','MF','FW'].map(pos => {
+    const list = t.squad[pos] || [];
+    const chips = list.map((nm, pi) => `
+      <span class="squad-chip">${escHtml(nm)}<button class="squad-chip-x" onclick="teamRemovePlayer('${pos}',${pi})" title="削除">×</button></span>`
+    ).join('') || '<span class="team-empty">未登録</span>';
+    return `
+      <div class="squad-section">
+        <div class="squad-section-title">${pos}<span>${list.length}</span></div>
+        <div class="squad-chips">${chips}</div>
+        <div class="input-row">
+          <input id="team-pl-input-${pos}" class="input-field" type="text" placeholder="${pos} に選手を追加" maxlength="30" autocomplete="off" onkeydown="if(event.key==='Enter')teamAddPlayer('${pos}')">
+          <button class="btn btn-secondary" onclick="teamAddPlayer('${pos}')">追加</button>
+        </div>
       </div>`;
   }).join('');
+  document.getElementById('team-content').innerHTML = `<div class="squad-grid">${sections}</div>`;
+}
+
+function openTeamDetail(gi, ti) { teamView = { gi, ti }; renderTeam(); }
+function backToTeamList() { teamView = null; renderTeam(); }
+
+function teamAddTeam(gi) {
+  const input = document.getElementById('team-add-input-' + gi);
+  const name = (input?.value || '').trim(); if (!name) return;
+  const d = TEAMDB.data;
+  if (d.groups[gi].teams.some(t => t.name === name)) { showToast('同じチームがあります'); return; }
+  d.groups[gi].teams.push({ name, squad: { GK:[], DF:[], MF:[], FW:[] } });
+  TEAMDB.save(d); renderTeam();
+}
+function teamDeleteTeam(gi, ti) {
+  const d = TEAMDB.data; d.groups[gi].teams.splice(ti, 1); TEAMDB.save(d); renderTeam();
+}
+function teamAddGroup() {
+  const input = document.getElementById('team-add-group-input');
+  const id = (input?.value || '').trim(); if (!id) return;
+  const d = TEAMDB.data;
+  if (d.groups.some(g => g.id === id)) { showToast('同じグループがあります'); return; }
+  d.groups.push({ id, teams: [] }); TEAMDB.save(d); renderTeam();
+}
+async function teamDeleteGroup(gi) {
+  const d = TEAMDB.data; const g = d.groups[gi]; if (!g) return;
+  const ok = await showDialog('グループを削除', `グループ ${g.id}（${g.teams.length}チーム）を削除しますか？`);
+  if (!ok) return;
+  d.groups.splice(gi, 1); TEAMDB.save(d); renderTeam();
+}
+function teamAddPlayer(pos) {
+  if (!teamView) return;
+  const input = document.getElementById('team-pl-input-' + pos);
+  const name = (input?.value || '').trim(); if (!name) return;
+  const d = TEAMDB.data; const t = d.groups[teamView.gi].teams[teamView.ti];
+  if (!t.squad[pos]) t.squad[pos] = [];
+  t.squad[pos].push(name); TEAMDB.save(d);
+  renderTeam();
+  setTimeout(() => document.getElementById('team-pl-input-' + pos)?.focus(), 20);
+}
+function teamRemovePlayer(pos, pi) {
+  if (!teamView) return;
+  const d = TEAMDB.data; const t = d.groups[teamView.gi].teams[teamView.ti];
+  t.squad[pos].splice(pi, 1); TEAMDB.save(d); renderTeam();
+}
+async function teamResetDefault() {
+  const ok = await showDialog('初期データに戻す', '編集内容を破棄して、48カ国の初期データに戻しますか？');
+  if (!ok) return;
+  TEAMDB.reset(); teamView = null; renderTeam(); showToast('初期データに戻しました');
 }
 
 // ===== キーボード・初期化 =====
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('ev-player').addEventListener('keydown', e => { if (e.key === 'Enter') addEvent(); });
-  document.getElementById('ev-note').addEventListener('keydown',   e => { if (e.key === 'Enter') addEvent(); });
   document.getElementById('ev-minute').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('ev-player').focus(); });
   document.getElementById('m-away').addEventListener('keydown',    e => { if (e.key === 'Enter') startMatch(); });
-  document.getElementById('fm-player-input').addEventListener('keydown', e => { if (e.key === 'Enter') fmAddPlayer(); });
   document.getElementById('screen-formation').addEventListener('pointerdown', fmPointerDown);
+  const sc = document.getElementById('sketch-canvas');
+  if (sc) {
+    sc.addEventListener('pointerdown', sketchDown);
+    sc.addEventListener('pointermove', sketchMove);
+    sc.addEventListener('pointerup', sketchEnd);
+    sc.addEventListener('pointercancel', sketchEnd);
+    sc.addEventListener('pointerleave', sketchEnd);
+  }
   refreshDatalists();
 
   if ('serviceWorker' in navigator) {

@@ -1,6 +1,6 @@
 {
-  "name": "サッカー観戦メモ",
-  "short_name": "観戦メモ",
+  "name": "Football-Memo",
+  "short_name": "Football-Memo",
   "description": "観戦したサッカーの試合を記録し、フォーメーションを作成できるアプリ",
   "start_url": "./index.html",
   "display": "standalone",

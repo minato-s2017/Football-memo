@@ -45,7 +45,7 @@ html, body {
   padding: 0 20px 24px; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 16px;
 }
 .sidebar-logo-icon { font-size: 28px; }
-.sidebar-logo-text { font-size: 16px; font-weight: 800; line-height: 1.2; color: var(--white); }
+.sidebar-logo-text { font-size: 16px; font-weight: 800; line-height: 1.2; color: var(--white); white-space: nowrap; letter-spacing: 0.3px; }
 .nav-item {
   display: flex; align-items: center; gap: 10px; padding: 12px 20px;
   cursor: pointer; color: var(--text-muted); font-size: 15px; font-weight: 500;
@@ -54,7 +54,6 @@ html, body {
 }
 .nav-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
 .nav-item.active { background: rgba(50,100,190,0.2); color: var(--white); font-weight: 700; border-left-color: var(--accent-light); }
-.nav-item-icon { font-size: 18px; width: 24px; text-align: center; }
 
 /* ===== メイン ===== */
 .main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
@@ -110,27 +109,17 @@ select.input-field { cursor: pointer; }
 }
 
 /* ===== ホーム ===== */
-.home-welcome {
-  display: flex; align-items: center; gap: 20px;
-  background: linear-gradient(135deg, var(--bg3), var(--accent-dark));
-  border-radius: var(--radius); padding: 28px 32px;
-  border: 1px solid rgba(255,255,255,0.1);
-}
-.home-welcome-icon {
-  font-size: 40px; line-height: 1; background: var(--white); color: var(--accent-dark);
-  width: 76px; height: 76px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.home-welcome h2 { font-size: 24px; font-weight: 800; margin-bottom: 4px; color: var(--white); }
-.home-welcome p { color: #d6e0ff; font-size: 14px; }
-.home-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+.hero { padding: 30px 4px 10px; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 4px; }
+.hero-mark { font-size: 38px; font-weight: 800; letter-spacing: 0.5px; color: var(--white); line-height: 1.1; }
+.hero-tagline { font-size: 14px; color: var(--text-muted); margin-top: 10px; letter-spacing: 1.5px; }
+.home-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(184px, 1fr)); gap: 14px; }
 .home-card {
   background: var(--card); border-radius: var(--radius); padding: 20px;
   cursor: pointer; border: 2px solid transparent;
   transition: border-color 0.15s, transform 0.15s; display: flex; flex-direction: column; gap: 10px;
 }
 .home-card:hover { border-color: var(--accent); transform: translateY(-2px); }
-.home-card-icon { font-size: 26px; }
-.home-card-title { font-size: 14px; font-weight: 700; }
+.home-card-title { font-size: 17px; font-weight: 800; color: var(--accent-light); letter-spacing: 0.3px; }
 .home-card-desc { font-size: 12px; color: var(--text-muted); line-height: 1.6; }
 
 /* ===== 観戦中（ライブ） ===== */
@@ -141,7 +130,7 @@ select.input-field { cursor: pointer; }
 }
 .game-toolbar-title { font-size: 18px; font-weight: 700; }
 .game-toolbar-date { font-size: 13px; color: var(--text-muted); }
-.game-toolbar .btn-danger { margin-left: auto; }
+.game-toolbar-actions { margin-left: auto; display: flex; gap: 10px; }
 
 .live-body { overflow-y: auto; flex: 1; padding: 18px 36px 36px; }
 
@@ -222,6 +211,11 @@ select.input-field { cursor: pointer; }
 }
 .tl-del:hover { color: var(--danger); background: rgba(239,35,60,0.12); }
 .tl-empty { color: var(--text-muted); font-size: 13px; padding: 16px 4px; text-align: center; }
+.tl-half-label { font-size: 12px; font-weight: 800; color: var(--accent-light); letter-spacing: 1px; margin: 10px 2px 2px; }
+.tl-sketch { width: 40px; height: 50px; object-fit: cover; border-radius: 6px; border: 1px solid rgba(255,255,255,0.25); background: #fff; cursor: pointer; flex-shrink: 0; }
+.tl-memo-btn { border: 1px solid rgba(255,255,255,0.18); background: transparent; color: var(--text-muted); font-size: 14px; width: 30px; height: 30px; border-radius: 6px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.tl-memo-btn:hover { color: var(--accent-light); border-color: var(--accent); }
+.ef-memo-hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 
 /* 総評カード */
 .review-card {
@@ -283,6 +277,8 @@ select.input-field { cursor: pointer; }
 }
 
 /* ===== チーム成績 ===== */
+.standings-group { margin-bottom: 22px; }
+.standings-group-head { font-size: 15px; font-weight: 800; color: var(--accent-light); letter-spacing: 0.5px; margin-bottom: 8px; }
 .ranking-table { background: var(--card); border-radius: var(--radius); overflow: hidden; }
 .ranking-header, .ranking-row {
   display: grid;
@@ -308,6 +304,8 @@ select.input-field { cursor: pointer; }
 .team-color-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
 
 /* ===== 集計 ===== */
+.agg-filters { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+.agg-filters .form-group { min-width: 200px; flex: 1; }
 .agg-layout { display: grid; grid-template-columns: 300px 1fr; gap: 0; flex: 1; overflow: hidden; }
 .agg-panel { padding: 24px; overflow-y: auto; }
 .agg-panel-left { border-right: 1px solid rgba(255,255,255,0.08); }
@@ -405,6 +403,10 @@ select.input-field { cursor: pointer; }
 }
 .fm-slot.filled:hover .fm-slot-x { display: flex; }
 .fm-drop-hint { outline: 2px solid var(--accent-light); outline-offset: 2px; border-radius: 50%; }
+/* カスタム自由配置：枠を移動できる状態 */
+.fm-slot-movable { cursor: move; touch-action: none; }
+.fm-slot-movable .fm-slot-dot { box-shadow: 0 0 0 2px var(--accent-light), 0 2px 8px rgba(0,0,0,0.45); }
+.fm-custom-hint { font-size: 12px; color: var(--accent-light); margin-top: 10px; text-align: center; }
 
 .fm-roster-hint { font-size: 12px; color: var(--text-muted); line-height: 1.6; }
 .fm-bench {
@@ -450,6 +452,42 @@ select.input-field { cursor: pointer; }
 .fm-saved-x:hover { color: var(--danger); background: rgba(239,35,60,0.12); }
 .fm-saved-empty, .fm-bench-empty { color: var(--text-muted); font-size: 12px; }
 
+/* ===== TEAM（グループ・チーム・選手） ===== */
+.team-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.team-group {
+  background: var(--card); border-radius: var(--radius); border: 1px solid rgba(255,255,255,0.08);
+  padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;
+}
+.team-group-head { display: flex; align-items: center; justify-content: space-between; font-size: 16px; font-weight: 800; color: var(--accent-light); }
+.tg-count { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.tg-del { background: none; border: none; color: var(--text-muted); font-size: 16px; cursor: pointer; width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; padding: 0; }
+.tg-del:hover { color: var(--danger); background: rgba(239,35,60,0.12); }
+.team-chip-list { display: flex; flex-direction: column; gap: 6px; }
+.team-chip-btn {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  background: var(--bg2); border: 1px solid transparent; border-radius: var(--radius-sm);
+  padding: 9px 12px; cursor: pointer; color: var(--text); transition: border-color 0.15s, background 0.15s;
+}
+.team-chip-btn:hover { border-color: var(--accent); background: var(--card2); }
+.tcb-name { flex: 1; font-size: 14px; font-weight: 700; }
+.tcb-count { font-size: 12px; color: var(--text-muted); }
+.tcb-del { color: var(--text-muted); font-size: 15px; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 5px; }
+.tcb-del:hover { color: var(--danger); background: rgba(239,35,60,0.12); }
+.team-add-row { margin-top: 2px; }
+.team-add-group { max-width: 440px; margin-top: 4px; }
+.team-empty { color: var(--text-muted); font-size: 13px; padding: 2px 0; }
+.squad-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.squad-section {
+  background: var(--card); border-radius: var(--radius); border: 1px solid rgba(255,255,255,0.08);
+  padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;
+}
+.squad-section-title { font-size: 14px; font-weight: 800; color: var(--accent-light); }
+.squad-section-title span { color: var(--text-muted); font-weight: 600; font-size: 12px; margin-left: 6px; }
+.squad-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.squad-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--card2); border-radius: 16px; padding: 4px 6px 4px 12px; font-size: 13px; font-weight: 600; }
+.squad-chip-x { width: 16px; height: 16px; border-radius: 50%; border: none; background: rgba(255,255,255,0.2); color: var(--white); font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; padding: 0; }
+.squad-chip-x:hover { background: var(--danger); }
+
 /* ===== ダイアログ ===== */
 .dialog-overlay {
   position: fixed; inset: 0; z-index: 100;
@@ -461,6 +499,25 @@ select.input-field { cursor: pointer; }
 .dialog h3 { font-size: 18px; font-weight: 700; margin-bottom: 10px; }
 .dialog p { font-size: 14px; color: var(--text-muted); margin-bottom: 24px; line-height: 1.7; white-space: pre-line; }
 .dialog-buttons { display: flex; justify-content: flex-end; gap: 10px; }
+.sketch-dialog { width: auto; max-width: 92vw; }
+.sketch-wrap { display: flex; justify-content: center; margin-bottom: 18px; }
+#sketch-canvas { width: 340px; max-width: 78vw; height: auto; aspect-ratio: 340 / 430; background: #fff; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); touch-action: none; cursor: crosshair; }
+
+/* 試合の布陣（4c） */
+.fm-match-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  background: rgba(50,100,190,0.15); border: 1px solid var(--accent); color: var(--text);
+  border-radius: var(--radius-sm); padding: 10px 16px; margin: 12px 28px 0; font-size: 13px;
+}
+.lineup-dialog { width: auto; max-width: 92vw; }
+.lineup-canvas-wrap { display: flex; justify-content: center; margin-bottom: 18px; }
+.lineup-canvas-wrap canvas { width: 320px; max-width: 78vw; height: auto; border-radius: 8px; }
+.tl-lineup-btn {
+  border: 1px solid var(--accent); background: rgba(50,100,190,0.12); color: var(--accent-light);
+  font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 6px; cursor: pointer; flex-shrink: 0; white-space: nowrap;
+}
+.tl-lineup-btn:hover { background: rgba(50,100,190,0.25); }
+.tl-sub-arrow { color: var(--accent-light); font-weight: 800; margin: 0 2px; }
 
 /* ===== トースト ===== */
 .toast {
@@ -476,17 +533,16 @@ select.input-field { cursor: pointer; }
 
 /* ===== iPad 縦持ち・狭い画面の最適化（〜860px） ===== */
 @media (max-width: 860px) {
-  :root { --sidebar-w: 60px; }
+  :root { --sidebar-w: 104px; }
   .sidebar { padding: 14px 0 12px; }
-  .sidebar-logo { justify-content: center; padding: 0 0 16px; }
-  .sidebar-logo-text { display: none; }
-  .sidebar-logo-icon { font-size: 26px; }
-  .nav-item { font-size: 0; justify-content: center; gap: 0; padding: 15px 0; }
-  .nav-item-icon { font-size: 22px; width: auto; }
+  .sidebar-logo { justify-content: center; padding: 0 6px 14px; }
+  .sidebar-logo-text { font-size: 12px; }
+  .nav-item { font-size: 12px; justify-content: center; text-align: center; gap: 0; padding: 13px 4px; }
 
   .page-header { padding: 18px 18px 14px; }
   .page-header h1 { font-size: 20px; }
   .content { padding: 18px; gap: 16px; }
+  .hero-mark { font-size: 30px; }
   .home-cards { grid-template-columns: repeat(2, 1fr); }
   .form-2col { grid-template-columns: 1fr; }
 
