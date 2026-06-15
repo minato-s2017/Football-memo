@@ -138,14 +138,9 @@
         <div class="starting-member-panel">
           <div class="sm-head">
             <div class="sm-title">Starting Member</div>
-            <div class="seg" id="sm-side-seg">
-              <button class="seg-btn active" id="sm-side-home" onclick="setSmSide('home')">チーム1</button>
-              <button class="seg-btn"        id="sm-side-away" onclick="setSmSide('away')">チーム2</button>
-            </div>
-            <button class="btn btn-secondary" onclick="editStartingMember()">編集</button>
           </div>
           <div id="sm-canvas-wrap" class="sm-canvas-wrap"></div>
-          <div class="sm-note">「Formation」タブで作ったものがベースです。ここでの変更はこの試合だけに保存され、Formationタブは変わりません。交代を記録すると自動で反映されます。</div>
+          <div class="sm-note">2チームを横並びで表示。各チームの「編集」はこの試合だけに保存され、「Formation」タブのベースは変わりません。交代を記録すると自動で反映されます。</div>
         </div>
 
         <!-- イベント追加フォーム -->
@@ -191,6 +186,7 @@
             </div>
             <button class="btn btn-primary" style="align-self:flex-end;" onclick="addEvent()">＋ 記録</button>
           </div>
+          <div id="ev-scorer-pick" class="ev-scorer-pick"></div>
           <div class="ef-memo-hint">記録した各イベントの「✎」から、状況を<strong>手書きメモ</strong>で残せます。</div>
         </div>
 
@@ -465,7 +461,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="teams-data.js?v=6"></script>
+<script src="teams-data.js?v=7"></script>
 <script src="app.js"></script>
 </body>
 </html>

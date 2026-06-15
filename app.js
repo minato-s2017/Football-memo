@@ -249,7 +249,7 @@ function openLiveScreen(matchId) {
   DB.saveMatches(matches);
   refreshDatalists();
 
-  liveSide = 'home'; liveType = 'goal'; liveHalf = 1; smSide = 'home';
+  liveSide = 'home'; liveType = 'goal'; liveHalf = 1;
   syncSegButtons();
   evSyncSubFields();
 
@@ -264,14 +264,15 @@ function openLiveScreen(matchId) {
   document.getElementById('live-memo').value = m.memo || '';
 
   renderStartingMember();
+  renderScorerPick();
   renderLiveScoreboard();
   renderTimeline();
   renderRatingStars();
   showScreen('live');
 }
 
-function setEvSide(side) { liveSide = side; syncSegButtons(); }
-function setEvType(type) { liveType = type; syncSegButtons(); evSyncSubFields(); }
+function setEvSide(side) { liveSide = side; syncSegButtons(); renderScorerPick(); }
+function setEvType(type) { liveType = type; syncSegButtons(); evSyncSubFields(); renderScorerPick(); }
 function setEvHalf(h) { liveHalf = h; syncSegButtons(); }
 function evSyncSubFields() {
   const isSub = liveType === 'sub';
@@ -311,6 +312,7 @@ function addEvent() {
   renderLiveScoreboard();
   renderTimeline();
   renderStartingMember();
+  renderScorerPick();
   refreshDatalists();
 }
 
@@ -323,6 +325,7 @@ function deleteEvent(eid) {
   renderLiveScoreboard();
   renderTimeline();
   renderStartingMember();
+  renderScorerPick();
 }
 
 function renderLiveScoreboard() {
@@ -1345,25 +1348,65 @@ function applySub(m, ev) {
   if (idx !== undefined) L.assignments[idx] = ev.playerIn;
 }
 
-// ===== スタメン（観戦画面に常時表示：Formationタブのベースを表示。編集はこの試合のみ保存） =====
-let smSide = 'home';
-function setSmSide(side) { smSide = side; renderStartingMember(); }
+// ===== スタメン（観戦画面に2チーム横並びで常時表示：Formationタブのベースを表示。編集はこの試合のみ保存） =====
 function renderStartingMember() {
   const m = DB.matches.find(x => x.id === currentMatchId);
   if (!m) return;
-  const side = smSide;
-  const teamName = side === 'home' ? m.homeTeam : m.awayTeam;
-  const L = (m.lineups && m.lineups[side]) || { preset: DEFAULT_PRESET, layout: null, assignments: {} };
-  const hb = document.getElementById('sm-side-home'), ab = document.getElementById('sm-side-away');
-  if (hb) hb.classList.toggle('active', side === 'home');
-  if (ab) ab.classList.toggle('active', side === 'away');
   const wrap = document.getElementById('sm-canvas-wrap');
   if (!wrap) return;
   wrap.innerHTML = '';
-  wrap.appendChild(fmRenderCanvas({ team: teamName, preset: L.preset, layout: L.layout, assignments: L.assignments }));
+  ['home', 'away'].forEach(side => {
+    const teamName = side === 'home' ? m.homeTeam : m.awayTeam;
+    const L = (m.lineups && m.lineups[side]) || { preset: DEFAULT_PRESET, layout: null, assignments: {} };
+    const col = document.createElement('div');
+    col.className = 'sm-col';
+    const head = document.createElement('div');
+    head.className = 'sm-col-head';
+    head.innerHTML = `<span class="sm-col-name"><span class="sm-col-dot" style="background:${teamColor(teamName)}"></span>${escHtml(teamName || (side === 'home' ? 'チーム1' : 'チーム2'))}</span>`;
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-secondary sm-edit-btn';
+    btn.textContent = '編集';
+    btn.addEventListener('click', () => editStartingMember(side));
+    head.appendChild(btn);
+    col.appendChild(head);
+    const cc = document.createElement('div');
+    cc.className = 'sm-col-canvas';
+    cc.appendChild(fmRenderCanvas({ team: teamName, preset: L.preset, layout: L.layout, assignments: L.assignments }));
+    col.appendChild(cc);
+    wrap.appendChild(col);
+  });
 }
 // この試合だけのスタメン編集（Formation画面を試合モードで開く＝保存先は試合のみ、ベースは不変）
-function editStartingMember() { if (currentMatchId) openMatchFormationEdit(currentMatchId, smSide); }
+function editStartingMember(side) { if (currentMatchId) openMatchFormationEdit(currentMatchId, side || 'home'); }
+
+// イベント種別ごとの選手トグル：goal/yellow/red=現スタメンから1人、sub=OUT(現スタメン)＋IN(控え=squad−現スタメン)。note は非表示。交代すると候補が入れ替わる。
+const byJerseyNo = (a, b) => (parseInt(a, 10) || 999) - (parseInt(b, 10) || 999);
+function espChipGroup(label, names, targetId) {
+  if (!names.length) return `<div class="esp-group"><div class="esp-label">${escHtml(label)}</div><div class="esp-empty">候補の選手がいません</div></div>`;
+  const cur = (document.getElementById(targetId).value || '').trim();
+  return `<div class="esp-group"><div class="esp-label">${escHtml(label)}：タップで選択</div><div class="esp-chips">` +
+    names.map(n => `<button type="button" class="esp-chip${n === cur ? ' active' : ''}" data-target="${targetId}" data-name="${escHtml(n)}">${escHtml(n)}</button>`).join('') +
+    `</div></div>`;
+}
+function renderScorerPick() {
+  const wrap = document.getElementById('ev-scorer-pick');
+  if (!wrap) return;
+  const m = DB.matches.find(x => x.id === currentMatchId);
+  if (!m || liveType === 'note') { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
+  wrap.style.display = '';
+  const L = m.lineups && m.lineups[liveSide];
+  const onPitch = (L ? Object.values(L.assignments).filter(Boolean) : []).slice().sort(byJerseyNo);
+  const sideLabel = liveSide === 'home' ? 'チーム1' : 'チーム2';
+  if (liveType === 'sub') {
+    const teamName = liveSide === 'home' ? m.homeTeam : m.awayTeam;
+    const bench = fmSquadOf(teamName).filter(n => !onPitch.includes(n)).slice().sort(byJerseyNo);
+    wrap.innerHTML = espChipGroup(`OUT（退く選手・${sideLabel}）`, onPitch, 'ev-player') +
+                     espChipGroup('IN（入る選手・控え）', bench, 'ev-player2');
+  } else {
+    const label = liveType === 'goal' ? '得点者' : liveType === 'yellow' ? '警告を受けた選手' : liveType === 'red' ? '退場した選手' : '選手';
+    wrap.innerHTML = espChipGroup(`${label}（${sideLabel}）`, onPitch, 'ev-player');
+  }
+}
 
 let currentLineupSide = 'home';
 function openLineup(side) {
@@ -1773,6 +1816,18 @@ document.addEventListener('DOMContentLoaded', () => {
     tp.addEventListener('click', e => {
       const chip = e.target.closest('.team-pick-chip');
       if (chip && chip.dataset.team) toggleTeamPick(chip.dataset.team);
+    });
+  }
+
+  // 観戦：得点者トグル（現在のスタメンから選択・もう一度タップで解除）
+  const esp = document.getElementById('ev-scorer-pick');
+  if (esp) {
+    esp.addEventListener('click', e => {
+      const chip = e.target.closest('.esp-chip');
+      if (!chip) return;
+      const inp = document.getElementById('ev-player');
+      inp.value = (inp.value.trim() === chip.dataset.name) ? '' : chip.dataset.name;
+      renderScorerPick();
     });
   }
 
