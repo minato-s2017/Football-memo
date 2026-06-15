@@ -72,6 +72,7 @@ function showScreen(id) {
     team:'nav-team',
     formation:'nav-formation',
     standings:'nav-standings',
+    tournament:'nav-tournament',
     agg:'nav-agg',
   };
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -129,32 +130,98 @@ function refreshDatalists() {
 // ===== ホーム =====
 function initHome() { refreshDatalists(); showScreen('home'); }
 
-// ===== 観戦を記録（作成） =====
+// ===== 観戦を記録（作成・大会モード） =====
+let createStage = 'group';   // 'group' | 'knockout'
+let createSel = [];          // 選択中チーム名（最大2・順序＝チーム1,チーム2）
+
 function openCreateScreen() {
   refreshDatalists();
-  document.getElementById('m-comp').value  = '';
-  document.getElementById('m-home').value  = '';
-  document.getElementById('m-away').value  = '';
-  document.getElementById('m-venue').value = '';
-  document.getElementById('m-method').value = '';
+  TEAMDB.ensureSeed();
+  createStage = 'group';
+  createSel = [];
+  document.getElementById('m-group').innerHTML =
+    TEAMDB.data.groups.map(g => `<option value="${escHtml(g.id)}">グループ ${escHtml(g.id)}</option>`).join('');
   document.getElementById('m-date').value  = new Date().toISOString().slice(0, 10);
+  document.getElementById('m-venue').value = '';
+  setMatchStage('group');
   showScreen('create');
-  setTimeout(() => document.getElementById('m-home').focus(), 50);
+}
+
+function setMatchStage(stage) {
+  createStage = stage;
+  createSel = [];
+  document.getElementById('mstage-group').classList.toggle('active', stage === 'group');
+  document.getElementById('mstage-knockout').classList.toggle('active', stage === 'knockout');
+  document.getElementById('m-group-field').style.display = stage === 'group' ? '' : 'none';
+  document.getElementById('m-team-pick-label').textContent = stage === 'group'
+    ? 'チーム（グループから2つ選択：先に選んだ方がチーム1）'
+    : 'チーム（ベスト32から2つ選択：先に選んだ方がチーム1）';
+  renderTeamPick();
+}
+
+// 現在のステージ／グループで選べるチーム一覧
+function createPickTeams() {
+  if (createStage === 'group') {
+    const gid = document.getElementById('m-group').value;
+    const g = TEAMDB.data.groups.find(x => x.id === gid);
+    return g ? g.teams.map(t => t.name) : [];
+  }
+  return TOURNEY.assignedTeams();
+}
+
+function renderTeamPick() {
+  createSel = [];   // グループ／ステージ変更時は選択をリセット
+  const teams = createPickTeams();
+  const wrap = document.getElementById('m-team-pick');
+  if (!teams.length) {
+    wrap.innerHTML = createStage === 'knockout'
+      ? `<div class="team-pick-empty">「Tournament」タブでベスト32にチームを割り当てると、ここから選べます。</div>`
+      : `<div class="team-pick-empty">このグループにチームがありません。「Team」タブで追加してください。</div>`;
+  } else {
+    wrap.innerHTML = teams.map(t =>
+      `<button type="button" class="team-pick-chip" data-team="${escHtml(t)}"><span class="tp-dot" style="background:${teamColor(t)}"></span>${escHtml(t)}</button>`
+    ).join('');
+  }
+  syncTeamPickUI();
+}
+
+function toggleTeamPick(team) {
+  const i = createSel.indexOf(team);
+  if (i >= 0) createSel.splice(i, 1);
+  else if (createSel.length < 2) createSel.push(team);
+  else { showToast('チームは2つまで。選び直すには選択を解除してください'); return; }
+  syncTeamPickUI();
+}
+
+function syncTeamPickUI() {
+  document.querySelectorAll('#m-team-pick .team-pick-chip').forEach(ch => {
+    const idx = createSel.indexOf(ch.dataset.team);
+    ch.classList.toggle('selected', idx >= 0);
+    const old = ch.querySelector('.tp-badge'); if (old) old.remove();
+    if (idx >= 0) { const b = document.createElement('span'); b.className = 'tp-badge'; b.textContent = idx === 0 ? '1' : '2'; ch.appendChild(b); }
+  });
+  const t1 = createSel[0], t2 = createSel[1];
+  document.getElementById('m-team-pick-sel').innerHTML = (t1 || t2)
+    ? `<span class="tps-item">チーム1：<strong style="color:${t1 ? teamColor(t1) : 'inherit'}">${t1 ? escHtml(t1) : '—'}</strong></span>
+       <span class="tps-vs">vs</span>
+       <span class="tps-item">チーム2：<strong style="color:${t2 ? teamColor(t2) : 'inherit'}">${t2 ? escHtml(t2) : '—'}</strong></span>`
+    : `<span class="tps-empty">チームを2つ選んでください</span>`;
 }
 
 function startMatch() {
-  const homeTeam = document.getElementById('m-home').value.trim();
-  const awayTeam = document.getElementById('m-away').value.trim();
+  const homeTeam = createSel[0] || '';
+  const awayTeam = createSel[1] || '';
   const date     = document.getElementById('m-date').value;
-  if (!homeTeam || !awayTeam) { showToast('ホーム・アウェイの両チームを入力してください'); return; }
+  if (!homeTeam || !awayTeam) { showToast('チームを2つ選択してください'); return; }
   if (!date) { showToast('日付を選択してください'); return; }
 
   const match = {
     id: uuid(),
-    competition: document.getElementById('m-comp').value.trim(),
+    competition: 'FIFA WORLD CUP 26',
+    stage: createStage,
     homeTeam, awayTeam, date,
     venue:       document.getElementById('m-venue').value.trim(),
-    watchMethod: document.getElementById('m-method').value,
+    watchMethod: '',
     events: [],
     memo: '',
     rating: 0,
@@ -263,13 +330,13 @@ function scoreboardHtml(m) {
   const ac = goalCount(m, 'away');
   return `<div class="scoreboard">
     <div class="score-team">
-      <div class="score-team-label">HOME</div>
+      <div class="score-team-label">TEAM 1</div>
       <div class="score-team-name"><span class="score-dot" style="background:${teamColor(m.homeTeam)}"></span>${escHtml(m.homeTeam || '?')}</div>
       <div class="score-team-pts">${hc}</div>
     </div>
     <div class="score-vs">VS</div>
     <div class="score-team">
-      <div class="score-team-label">AWAY</div>
+      <div class="score-team-label">TEAM 2</div>
       <div class="score-team-name"><span class="score-dot" style="background:${teamColor(m.awayTeam)}"></span>${escHtml(m.awayTeam || '?')}</div>
       <div class="score-team-pts">${ac}</div>
     </div>
@@ -594,7 +661,8 @@ async function deleteMatch() {
 // ===== チーム成績 =====
 function openStandingsScreen() {
   TEAMDB.ensureSeed();
-  const matches = DB.matches.filter(m => m.finished && m.homeTeam && m.awayTeam);
+  // グループリーグの試合のみ集計（決勝トーナメントは除外。stage未設定のレガシーはグループ扱い）
+  const matches = DB.matches.filter(m => m.finished && m.homeTeam && m.awayTeam && m.stage !== 'knockout');
 
   const stats = {};
   const ensure = name => { if (!stats[name]) stats[name] = { name, gp:0, w:0, d:0, l:0, gf:0, ga:0 }; return stats[name]; };
@@ -661,7 +729,7 @@ function openStandingsScreen() {
   if (unsorted.length) html += `<div class="standings-group"><div class="standings-group-head">未分類（フォルダ未登録）</div>${tableHtml(unsorted)}</div>`;
 
   document.getElementById('standings-table-area').innerHTML = html ||
-    `<div class="empty-state">記録済みの観戦がありません。<br>観戦を記録すると成績表が作られます。</div>`;
+    `<div class="empty-state">グループリーグの記録がありません。<br>グループリーグの試合を記録すると成績表が作られます。</div>`;
 
   const matchRows = matches.slice().reverse().map(m => `
       <div class="event-row" onclick="openMatchDetail('${m.id}')">
@@ -846,8 +914,15 @@ const FORMATIONS = {
     {pos:'CM', x:28, y:50}, {pos:'CM', x:50, y:52}, {pos:'CM', x:72, y:50},
     {pos:'ST', x:38, y:20}, {pos:'ST', x:62, y:20},
   ],
+  '3-1-4-2': [
+    {pos:'GK', x:50, y:90},
+    {pos:'CB', x:28, y:75}, {pos:'CB', x:50, y:77}, {pos:'CB', x:72, y:75},
+    {pos:'DM', x:50, y:60},
+    {pos:'LM', x:16, y:44}, {pos:'CM', x:39, y:46}, {pos:'CM', x:61, y:46}, {pos:'RM', x:84, y:44},
+    {pos:'ST', x:38, y:20}, {pos:'ST', x:62, y:20},
+  ],
 };
-const PRESET_ORDER = ['4-3-3','4-2-3-1','3-4-2-1','4-4-2','5-4-1','3-5-2','3-4-3','5-3-2'];
+const PRESET_ORDER = ['4-3-3','4-2-3-1','3-4-2-1','4-4-2','5-4-1','3-5-2','3-4-3','5-3-2','3-1-4-2'];
 const DEFAULT_PRESET = '4-4-2';
 
 // チーム名をキーに保存：{ [teamName]: { preset, layout, assignments } }
@@ -1288,7 +1363,7 @@ function renderLineupView() {
   const L = ensureLineup(m, side);
   document.getElementById('lineup-side-home').classList.toggle('active', side === 'home');
   document.getElementById('lineup-side-away').classList.toggle('active', side === 'away');
-  document.getElementById('lineup-title').textContent = `布陣：${teamName || (side === 'home' ? 'ホーム' : 'アウェイ')}`;
+  document.getElementById('lineup-title').textContent = `布陣：${teamName || (side === 'home' ? 'チーム1' : 'チーム2')}`;
   const canvas = fmRenderCanvas({ team: teamName, preset: L.preset, layout: L.layout, assignments: L.assignments });
   const wrap = document.getElementById('lineup-canvas-wrap');
   wrap.innerHTML = '';
@@ -1321,7 +1396,7 @@ function fmUpdateMatchBanner() {
   const teamInput = document.getElementById('fm-team');
   const savedWrap = document.getElementById('fm-saved-wrap');
   if (fmMatchCtx) {
-    const sideLabel = fmMatchCtx.side === 'home' ? 'ホーム' : 'アウェイ';
+    const sideLabel = fmMatchCtx.side === 'home' ? 'チーム1' : 'チーム2';
     banner.innerHTML = `<div>この試合の布陣を編集中：<strong>${escHtml(fmTeam)}</strong>（${sideLabel}）— 保存しても保存済みプリセットは変わりません</div>
       <button class="btn btn-secondary" onclick="fmBackToMatch()">← 試合に戻る</button>`;
     banner.style.display = '';
@@ -1512,11 +1587,123 @@ async function teamResetDefault() {
   TEAMDB.reset(); teamView = null; renderTeam(); showToast('初期データに戻しました');
 }
 
+// ===== Tournament（32チーム決勝トーナメント：R32→R16→QF→SF→Final＋3位） =====
+// データ＝R32スロットのチーム割当のみ保存。勝ち上がりは「決勝Tの試合結果」から都度計算（保存しない）。
+const TOURNEY = {
+  load() { try { const v = JSON.parse(localStorage.getItem('swm_tournament')); return (v && typeof v === 'object' && v.slots) ? v : { slots: {} }; } catch { return { slots: {} }; } },
+  save(v) { localStorage.setItem('swm_tournament', JSON.stringify(v)); },
+  get slots() { return this.load().slots; },
+  setSlot(i, team) { const t = this.load(); if (team) t.slots[i] = team; else delete t.slots[i]; this.save(t); },
+  assignedTeams() { const s = this.slots, arr = []; for (let i = 0; i < 32; i++) if (s[i]) arr.push(s[i]); return arr; },
+  assignedCount() { return this.assignedTeams().length; },
+  clearAll() { this.save({ slots: {} }); },
+};
+
+// チーム a,b の決勝T試合（記録済み・stage==='knockout'）から勝敗を解決
+function tourneyResolve(a, b) {
+  const res = { a: a || '', b: b || '', winner: '', loser: '', score: '' };
+  if (!a || !b) return res;
+  const ms = DB.matches.filter(m => m.finished && m.stage === 'knockout' &&
+    ((m.homeTeam === a && m.awayTeam === b) || (m.homeTeam === b && m.awayTeam === a)));
+  if (!ms.length) return res;
+  const m = ms[ms.length - 1];
+  const ga = goalCount(m, m.homeTeam === a ? 'home' : 'away');
+  const gb = goalCount(m, m.homeTeam === b ? 'home' : 'away');
+  res.score = `${ga}-${gb}`;
+  if (ga > gb) { res.winner = a; res.loser = b; }
+  else if (gb > ga) { res.winner = b; res.loser = a; }
+  return res; // 引き分けは winner='' のまま（PK等は未対応）
+}
+
+// R32割当＋記録結果からブラケット全体を計算
+function tourneyCompute() {
+  const s = TOURNEY.slots;
+  const out = { R32: [], R16: [], QF: [], SF: [], F: null, TH: null };
+  for (let i = 0; i < 16; i++) out.R32.push(tourneyResolve(s[2*i] || '', s[2*i+1] || ''));
+  for (let i = 0; i < 8;  i++) out.R16.push(tourneyResolve(out.R32[2*i].winner, out.R32[2*i+1].winner));
+  for (let i = 0; i < 4;  i++) out.QF.push(tourneyResolve(out.R16[2*i].winner, out.R16[2*i+1].winner));
+  for (let i = 0; i < 2;  i++) out.SF.push(tourneyResolve(out.QF[2*i].winner, out.QF[2*i+1].winner));
+  out.F  = tourneyResolve(out.SF[0].winner, out.SF[1].winner);
+  out.TH = tourneyResolve(out.SF[0].loser,  out.SF[1].loser);
+  return out;
+}
+
+function openTournamentScreen() {
+  TEAMDB.ensureSeed();
+  renderTournament();
+  showScreen('tournament');
+}
+
+// チーム選択肢（フォルダごとに optgroup）
+function tourneyTeamOptions(selected) {
+  let html = `<option value="">（未定）</option>`;
+  TEAMDB.data.groups.forEach(g => {
+    if (!g.teams.length) return;
+    html += `<optgroup label="グループ ${escHtml(g.id)}">` +
+      g.teams.map(t => `<option value="${escHtml(t.name)}"${t.name === selected ? ' selected' : ''}>${escHtml(t.name)}</option>`).join('') +
+      `</optgroup>`;
+  });
+  if (selected && !TEAMDB.allTeamNames().includes(selected)) {
+    html += `<optgroup label="その他"><option value="${escHtml(selected)}" selected>${escHtml(selected)}</option></optgroup>`;
+  }
+  return html;
+}
+
+function tourneyTeamRow(team, isWin, editable, slotIndex) {
+  if (editable) {
+    return `<div class="tk-team tk-team-edit${isWin ? ' tk-win' : ''}">
+        <select class="tk-slot" data-slot="${slotIndex}">${tourneyTeamOptions(team)}</select>
+      </div>`;
+  }
+  const inner = team
+    ? `<span class="tk-dot" style="background:${teamColor(team)}"></span><span class="tk-name">${escHtml(team)}</span>`
+    : `<span class="tk-tbd">勝者未定</span>`;
+  return `<div class="tk-team${isWin ? ' tk-win' : ''}">${inner}</div>`;
+}
+
+function tourneyMatchCard(m, editable, idx) {
+  const sA = 2*idx, sB = 2*idx + 1;
+  const mid = m.score ? `<span class="tk-score">${escHtml(m.score)}</span>` : `<span class="tk-vs">vs</span>`;
+  return `<div class="tk-match">
+      ${tourneyTeamRow(m.a, m.winner && m.winner === m.a, editable, sA)}
+      <div class="tk-mid">${mid}</div>
+      ${tourneyTeamRow(m.b, m.winner && m.winner === m.b, editable, sB)}
+    </div>`;
+}
+
+function tourneyColHtml(name, cardsHtml) {
+  return `<div class="tk-col"><div class="tk-col-head">${escHtml(name)}</div>${cardsHtml}</div>`;
+}
+
+function renderTournament() {
+  const b = tourneyCompute();
+  const cols = [];
+  cols.push(tourneyColHtml('ベスト32', b.R32.map((m, i) => tourneyMatchCard(m, true, i)).join('')));
+  cols.push(tourneyColHtml('ベスト16', b.R16.map((m, i) => tourneyMatchCard(m, false, i)).join('')));
+  cols.push(tourneyColHtml('準々決勝', b.QF.map((m, i) => tourneyMatchCard(m, false, i)).join('')));
+  cols.push(tourneyColHtml('準決勝',   b.SF.map((m, i) => tourneyMatchCard(m, false, i)).join('')));
+  let last = `<div class="tk-final-label">決勝</div>${tourneyMatchCard(b.F, false, 0)}`;
+  last += `<div class="tk-final-label">3位決定戦</div>${tourneyMatchCard(b.TH, false, 0)}`;
+  if (b.F.winner) last += `<div class="tk-champion"><div class="tk-champion-label">優勝</div><div class="tk-champion-name">${escHtml(b.F.winner)}</div></div>`;
+  cols.push(tourneyColHtml('決勝・3位', last));
+  const assigned = TOURNEY.assignedCount();
+  document.getElementById('tournament-bracket').innerHTML =
+    `<div class="tk-status">ベスト32：${assigned}/32 チーム割当済み</div>` +
+    `<div class="tk-grid">${cols.join('')}</div>`;
+}
+
+async function tourneyClearAll() {
+  const ok = await showDialog('割当をクリア', 'ベスト32のチーム割当をすべてクリアしますか？\n（記録した試合は消えません）');
+  if (!ok) return;
+  TOURNEY.clearAll();
+  renderTournament();
+  showToast('割当をクリアしました');
+}
+
 // ===== キーボード・初期化 =====
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('ev-player').addEventListener('keydown', e => { if (e.key === 'Enter') addEvent(); });
   document.getElementById('ev-minute').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('ev-player').focus(); });
-  document.getElementById('m-away').addEventListener('keydown',    e => { if (e.key === 'Enter') startMatch(); });
   document.getElementById('screen-formation').addEventListener('pointerdown', fmPointerDown);
   const sc = document.getElementById('sketch-canvas');
   if (sc) {
@@ -1545,6 +1732,25 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!e.target.classList.contains('tc-reset')) return;
       const team = e.target.closest('.tc-row') && e.target.closest('.tc-row').dataset.team;
       if (team) clearTeamColor(team);
+    });
+  }
+
+  // Tournament：ベスト32スロットのチーム割当
+  const tb = document.getElementById('tournament-bracket');
+  if (tb) {
+    tb.addEventListener('change', e => {
+      if (!e.target.classList.contains('tk-slot')) return;
+      TOURNEY.setSlot(+e.target.dataset.slot, e.target.value);
+      renderTournament();
+    });
+  }
+
+  // Record：チーム選択（トグル）
+  const tp = document.getElementById('m-team-pick');
+  if (tp) {
+    tp.addEventListener('click', e => {
+      const chip = e.target.closest('.team-pick-chip');
+      if (chip && chip.dataset.team) toggleTeamPick(chip.dataset.team);
     });
   }
 

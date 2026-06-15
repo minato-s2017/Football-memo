@@ -29,7 +29,8 @@
     <button class="nav-item"        id="nav-history"   onclick="openHistoryScreen()">History</button>
     <button class="nav-item"        id="nav-team"      onclick="openTeamScreen()">Team</button>
     <button class="nav-item"        id="nav-formation" onclick="openFormationScreen()">Formation</button>
-    <button class="nav-item"        id="nav-standings" onclick="openStandingsScreen()">Standings</button>
+    <button class="nav-item"        id="nav-standings" onclick="openStandingsScreen()">GroupLeague</button>
+    <button class="nav-item"        id="nav-tournament" onclick="openTournamentScreen()">Tournament</button>
     <button class="nav-item"        id="nav-agg"       onclick="openAggScreen()">Stats</button>
   </nav>
 
@@ -61,8 +62,12 @@
             <div class="home-card-desc">選手をドラッグ＆ドロップで配置・保存</div>
           </div>
           <div class="home-card" onclick="openStandingsScreen()">
-            <div class="home-card-title">Standings</div>
-            <div class="home-card-desc">観戦した試合からの勝点・得失点表</div>
+            <div class="home-card-title">GroupLeague</div>
+            <div class="home-card-desc">グループリーグの勝点・得失点表</div>
+          </div>
+          <div class="home-card" onclick="openTournamentScreen()">
+            <div class="home-card-title">Tournament</div>
+            <div class="home-card-desc">決勝トーナメント表（32チーム）</div>
           </div>
           <div class="home-card" onclick="openAggScreen()">
             <div class="home-card-title">Stats</div>
@@ -78,40 +83,34 @@
         <div><h1>観戦を記録</h1><div class="page-header-sub">対戦カードと日時を入力して観戦を開始</div></div>
       </div>
       <div class="content">
-        <div class="form-2col">
-          <div class="form-group">
-            <label class="form-label" for="m-comp">大会・リーグ</label>
-            <input id="m-comp" class="input-field" type="text" list="comp-options" placeholder="例：J1リーグ / 天皇杯 / W杯" maxlength="40" autocomplete="off">
+        <div class="form-group">
+          <label class="form-label">大会</label>
+          <div class="fixed-comp">FIFA WORLD CUP 26</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">ステージ</label>
+          <div class="seg" id="m-stage-seg">
+            <button class="seg-btn active" id="mstage-group"    onclick="setMatchStage('group')">グループリーグ</button>
+            <button class="seg-btn"        id="mstage-knockout" onclick="setMatchStage('knockout')">決勝トーナメント</button>
           </div>
+        </div>
+        <div class="form-group" id="m-group-field">
+          <label class="form-label" for="m-group">グループ</label>
+          <select id="m-group" class="input-field" onchange="renderTeamPick()"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" id="m-team-pick-label">チーム（2つ選択：先に選んだ方がチーム1）</label>
+          <div id="m-team-pick" class="team-pick"></div>
+          <div id="m-team-pick-sel" class="team-pick-sel"></div>
+        </div>
+        <div class="form-2col">
           <div class="form-group">
             <label class="form-label" for="m-date">日付</label>
             <input id="m-date" class="input-field" type="date">
           </div>
-        </div>
-        <div class="form-2col">
-          <div class="form-group">
-            <label class="form-label" for="m-home">ホームチーム</label>
-            <input id="m-home" class="input-field" type="text" list="team-options" placeholder="例：日本代表" maxlength="30" autocomplete="off">
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="m-away">アウェイチーム</label>
-            <input id="m-away" class="input-field" type="text" list="team-options" placeholder="例：ブラジル代表" maxlength="30" autocomplete="off">
-          </div>
-        </div>
-        <div class="form-2col">
           <div class="form-group">
             <label class="form-label" for="m-venue">会場（任意）</label>
-            <input id="m-venue" class="input-field" type="text" placeholder="例：埼玉スタジアム2002" maxlength="40" autocomplete="off">
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="m-method">視聴方法（任意）</label>
-            <select id="m-method" class="input-field">
-              <option value="">未選択</option>
-              <option value="stadium">スタジアム</option>
-              <option value="tv">テレビ</option>
-              <option value="stream">配信</option>
-              <option value="other">その他</option>
-            </select>
+            <input id="m-venue" class="input-field" type="text" placeholder="例：MetLife Stadium" maxlength="40" autocomplete="off">
           </div>
         </div>
         <div><button class="btn btn-primary btn-lg" onclick="startMatch()">▶ 観戦をはじめる</button></div>
@@ -155,8 +154,8 @@
             <div class="ef-field">
               <label class="form-label">チーム</label>
               <div class="seg" id="ev-side-seg">
-                <button class="seg-btn active" id="evside-home" onclick="setEvSide('home')">ホーム</button>
-                <button class="seg-btn"        id="evside-away" onclick="setEvSide('away')">アウェイ</button>
+                <button class="seg-btn active" id="evside-home" onclick="setEvSide('home')">チーム1</button>
+                <button class="seg-btn"        id="evside-away" onclick="setEvSide('away')">チーム2</button>
               </div>
             </div>
             <div class="ef-field ef-grow">
@@ -275,6 +274,7 @@
                 <option value="3-5-2">3-5-2</option>
                 <option value="3-4-3">3-4-3</option>
                 <option value="5-3-2">5-3-2</option>
+                <option value="3-1-4-2">3-1-4-2</option>
                 <option value="custom">カスタム（自由配置）</option>
               </select>
             </div>
@@ -312,12 +312,23 @@
     <!-- チーム成績 -->
     <div id="screen-standings" class="screen">
       <div class="page-header">
-        <div><h1>チーム成績</h1><div class="page-header-sub">観戦した試合からの集計（勝=3 / 分=1 / 負=0）</div></div>
+        <div><h1>グループリーグ</h1><div class="page-header-sub">グループリーグの集計（勝=3 / 分=1 / 負=0）</div></div>
         <button class="btn btn-secondary" onclick="openStandingsScreen()">更新</button>
       </div>
       <div class="content">
         <div id="standings-table-area"></div>
         <div id="standings-match-list"></div>
+      </div>
+    </div>
+
+    <!-- Tournament（決勝トーナメント） -->
+    <div id="screen-tournament" class="screen">
+      <div class="page-header">
+        <div><h1>Tournament</h1><div class="page-header-sub">決勝トーナメント（32チーム）— ベスト32にチームを割り当てると、Recordで記録した決勝Tの結果から自動で勝ち上がります</div></div>
+        <button class="btn btn-ghost" onclick="tourneyClearAll()">割当をクリア</button>
+      </div>
+      <div class="content">
+        <div id="tournament-bracket" class="tk-bracket"></div>
       </div>
     </div>
 
@@ -397,8 +408,8 @@
   <div class="dialog lineup-dialog">
     <h3 id="lineup-title">布陣</h3>
     <div class="seg" id="lineup-side-seg" style="margin-bottom:14px;">
-      <button class="seg-btn active" id="lineup-side-home" onclick="setLineupSide('home')">ホーム</button>
-      <button class="seg-btn"        id="lineup-side-away" onclick="setLineupSide('away')">アウェイ</button>
+      <button class="seg-btn active" id="lineup-side-home" onclick="setLineupSide('home')">チーム1</button>
+      <button class="seg-btn"        id="lineup-side-away" onclick="setLineupSide('away')">チーム2</button>
     </div>
     <div id="lineup-canvas-wrap" class="lineup-canvas-wrap"></div>
     <div class="dialog-buttons">
@@ -443,7 +454,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="teams-data.js?v=4"></script>
+<script src="teams-data.js?v=6"></script>
 <script src="app.js"></script>
 </body>
 </html>
