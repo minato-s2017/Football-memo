@@ -126,7 +126,8 @@ select.input-field { cursor: pointer; }
 .hero { padding: 30px 4px 10px; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 4px; }
 .hero-mark { font-size: 38px; font-weight: 800; letter-spacing: 0.5px; color: var(--white); line-height: 1.1; }
 .hero-tagline { font-size: 14px; color: var(--text-muted); margin-top: 10px; letter-spacing: 1.5px; }
-.home-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(184px, 1fr)); gap: 14px; }
+/* Record を全幅で大きく（1段目）＋残り6つを3列×2段に */
+.home-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 .home-card {
   background: var(--card); border-radius: var(--radius); padding: 20px;
   cursor: pointer; border: 2px solid transparent;
@@ -135,6 +136,22 @@ select.input-field { cursor: pointer; }
 .home-card:hover { border-color: var(--accent); transform: translateY(-2px); }
 .home-card-title { font-size: 17px; font-weight: 800; color: var(--accent-light); letter-spacing: 0.3px; }
 .home-card-desc { font-size: 12px; color: var(--text-muted); line-height: 1.6; }
+
+/* 大きく目立たせる Record カード（全幅・横並び・CTA付き） */
+.home-card-featured {
+  grid-column: 1 / -1;
+  flex-direction: row; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 24px 28px; border-color: var(--accent);
+  background: linear-gradient(120deg, rgba(50,100,190,0.22), var(--card) 62%);
+}
+.home-card-featured .home-card-title { font-size: 24px; color: var(--white); }
+.home-card-featured .home-card-desc { font-size: 13px; }
+.home-featured-text { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.home-featured-cta {
+  flex-shrink: 0; width: 48px; height: 48px; border-radius: 50%;
+  background: rgba(50,100,190,0.28); color: var(--accent-light);
+  display: flex; align-items: center; justify-content: center; font-size: 20px;
+}
 
 /* ===== 観戦中（ライブ） ===== */
 .game-toolbar {
@@ -637,6 +654,9 @@ select.input-field { cursor: pointer; }
   .hero-mark { font-size: 30px; }
   .hero-tagline { margin-top: 6px; }
   .home-card { padding: 16px; }
+  .home-card-featured { padding: 13px 24px; }
+  .home-card-featured .home-card-title { font-size: 20px; }
+  .home-featured-cta { width: 40px; height: 40px; font-size: 18px; }
 
   .game-toolbar { padding: 10px 32px; }
   #live-scoreboard { padding: 10px 32px 0; }
