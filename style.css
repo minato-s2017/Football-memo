@@ -248,9 +248,14 @@ select.input-field { cursor: pointer; }
 .tl-memo-btn:hover { color: var(--accent-light); border-color: var(--accent); }
 .ef-memo-hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 
-/* スタメン（布陣）クイックアクセス：イベント入力フォームの直上 */
-.starting-member-bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
-.starting-member-hint { font-size: 12px; color: var(--text-muted); flex: 1; min-width: 180px; line-height: 1.5; }
+/* スタメン常時表示パネル（Formationタブのベースをワンサイズ小さく表示）：イベント入力フォームの直上 */
+.starting-member-panel { background: var(--card); border: 1px solid rgba(255,255,255,0.08); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 16px; display: flex; flex-direction: column; gap: 10px; }
+.sm-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sm-title { font-size: 13px; font-weight: 800; color: var(--accent-light); letter-spacing: 0.5px; text-transform: uppercase; }
+.sm-head .btn { margin-left: auto; }
+.sm-canvas-wrap { display: flex; justify-content: center; }
+.sm-canvas-wrap canvas { width: 270px; max-width: 64vw; height: auto; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.45); }
+.sm-note { font-size: 11px; color: var(--text-muted); line-height: 1.55; text-align: center; }
 
 /* 総評カード */
 .review-card {
@@ -663,6 +668,7 @@ select.input-field { cursor: pointer; }
   .score-team { padding: 10px 20px; }
   .score-team-pts { font-size: 34px; }
   .live-body { padding: 12px 32px 24px; }
+  .sm-canvas-wrap canvas { width: 210px; }
 
   .fm-pitch-col { padding: 12px 24px 20px; }
   .fm-side { padding: 14px; }

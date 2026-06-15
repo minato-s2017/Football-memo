@@ -242,11 +242,14 @@ let liveHalf = 1;
 
 function openLiveScreen(matchId) {
   currentMatchId = matchId;
-  const m = DB.matches.find(x => x.id === matchId);
+  const matches = DB.matches;
+  const m = matches.find(x => x.id === matchId);
   if (!m) return;
+  ensureLineup(m, 'home'); ensureLineup(m, 'away');   // Formationタブのベースをこの試合へコピー（初回のみ）
+  DB.saveMatches(matches);
   refreshDatalists();
 
-  liveSide = 'home'; liveType = 'goal'; liveHalf = 1;
+  liveSide = 'home'; liveType = 'goal'; liveHalf = 1; smSide = 'home';
   syncSegButtons();
   evSyncSubFields();
 
@@ -260,6 +263,7 @@ function openLiveScreen(matchId) {
   document.getElementById('live-mom').value  = m.mom || '';
   document.getElementById('live-memo').value = m.memo || '';
 
+  renderStartingMember();
   renderLiveScoreboard();
   renderTimeline();
   renderRatingStars();
@@ -306,6 +310,7 @@ function addEvent() {
 
   renderLiveScoreboard();
   renderTimeline();
+  renderStartingMember();
   refreshDatalists();
 }
 
@@ -317,6 +322,7 @@ function deleteEvent(eid) {
   DB.saveMatches(matches);
   renderLiveScoreboard();
   renderTimeline();
+  renderStartingMember();
 }
 
 function renderLiveScoreboard() {
@@ -363,9 +369,6 @@ function timelineItemHtml(m, e, editable) {
   } else {
     main = e.player ? escHtml(e.player) : `<span style="color:var(--text-muted)">${def.label}</span>`;
   }
-  const lineupBtn = e.type === 'sub'
-    ? `<button class="tl-lineup-btn" onclick="openLineup('${e.side}')" title="布陣を見る">布陣</button>`
-    : '';
   const sketch = e.sketch
     ? `<img class="tl-sketch" src="${e.sketch}" onclick="openSketch('${e.id}')" alt="手書きメモ" title="手書きメモ">`
     : `<button class="tl-memo-btn" onclick="openSketch('${e.id}')" title="手書きメモを追加">✎</button>`;
@@ -377,7 +380,6 @@ function timelineItemHtml(m, e, editable) {
       <div class="tl-player">${tag}${main}</div>
       ${e.note ? `<div class="tl-note-text">${escHtml(e.note)}</div>` : ''}
     </div>
-    ${lineupBtn}
     ${sketch}
     ${del}
   </div>`;
@@ -1343,6 +1345,26 @@ function applySub(m, ev) {
   if (idx !== undefined) L.assignments[idx] = ev.playerIn;
 }
 
+// ===== スタメン（観戦画面に常時表示：Formationタブのベースを表示。編集はこの試合のみ保存） =====
+let smSide = 'home';
+function setSmSide(side) { smSide = side; renderStartingMember(); }
+function renderStartingMember() {
+  const m = DB.matches.find(x => x.id === currentMatchId);
+  if (!m) return;
+  const side = smSide;
+  const teamName = side === 'home' ? m.homeTeam : m.awayTeam;
+  const L = (m.lineups && m.lineups[side]) || { preset: DEFAULT_PRESET, layout: null, assignments: {} };
+  const hb = document.getElementById('sm-side-home'), ab = document.getElementById('sm-side-away');
+  if (hb) hb.classList.toggle('active', side === 'home');
+  if (ab) ab.classList.toggle('active', side === 'away');
+  const wrap = document.getElementById('sm-canvas-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  wrap.appendChild(fmRenderCanvas({ team: teamName, preset: L.preset, layout: L.layout, assignments: L.assignments }));
+}
+// この試合だけのスタメン編集（Formation画面を試合モードで開く＝保存先は試合のみ、ベースは不変）
+function editStartingMember() { if (currentMatchId) openMatchFormationEdit(currentMatchId, smSide); }
+
 let currentLineupSide = 'home';
 function openLineup(side) {
   const matches = DB.matches;
@@ -1397,7 +1419,7 @@ function fmUpdateMatchBanner() {
   const savedWrap = document.getElementById('fm-saved-wrap');
   if (fmMatchCtx) {
     const sideLabel = fmMatchCtx.side === 'home' ? 'チーム1' : 'チーム2';
-    banner.innerHTML = `<div>この試合の布陣を編集中：<strong>${escHtml(fmTeam)}</strong>（${sideLabel}）— 保存しても保存済みプリセットは変わりません</div>
+    banner.innerHTML = `<div>この試合のスタメンを編集中：<strong>${escHtml(fmTeam)}</strong>（${sideLabel}）— 保存しても「Formation」タブのベースは変わりません</div>
       <button class="btn btn-secondary" onclick="fmBackToMatch()">← 試合に戻る</button>`;
     banner.style.display = '';
     teamInput.disabled = true;

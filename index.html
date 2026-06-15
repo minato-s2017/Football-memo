@@ -134,10 +134,18 @@
       <div id="live-scoreboard"></div>
       <div class="live-body">
 
-        <!-- スタメン（布陣）クイックアクセス -->
-        <div class="starting-member-bar">
-          <button class="btn btn-secondary btn-lg" onclick="openLineup('home')">Starting Member</button>
-          <span class="starting-member-hint">両チームのスタメン（布陣）を確認・編集できます。交代を記録すると自動で反映されます。</span>
+        <!-- スタメン（Formationタブのベースを常時表示・この試合だけ編集可） -->
+        <div class="starting-member-panel">
+          <div class="sm-head">
+            <div class="sm-title">Starting Member</div>
+            <div class="seg" id="sm-side-seg">
+              <button class="seg-btn active" id="sm-side-home" onclick="setSmSide('home')">チーム1</button>
+              <button class="seg-btn"        id="sm-side-away" onclick="setSmSide('away')">チーム2</button>
+            </div>
+            <button class="btn btn-secondary" onclick="editStartingMember()">編集</button>
+          </div>
+          <div id="sm-canvas-wrap" class="sm-canvas-wrap"></div>
+          <div class="sm-note">「Formation」タブで作ったものがベースです。ここでの変更はこの試合だけに保存され、Formationタブは変わりません。交代を記録すると自動で反映されます。</div>
         </div>
 
         <!-- イベント追加フォーム -->
