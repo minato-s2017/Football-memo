@@ -1,10 +1,10 @@
-const CACHE_NAME = 'soccer-watch-memo-v20';
+const CACHE_NAME = 'soccer-watch-memo-v22';
 const ASSETS = [
   './',
   './index.html',
   './style.css',
   './app.js',
-  './teams-data.js?v=7',
+  './teams-data.js?v=8',
   './manifest.json',
   './icons/icon-180.png',
   './icons/icon-192.png',

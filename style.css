@@ -97,6 +97,8 @@ html, body {
 }
 .input-field:focus { border-color: var(--accent); }
 .input-field::placeholder { color: var(--text-muted); }
+/* チップでタップ選択する欄（readonly）はキーボードを出さない＝編集カーソルを出さない */
+.input-field[readonly] { cursor: default; background: var(--bg3); }
 .input-row { display: flex; gap: 10px; align-items: flex-end; }
 .input-row .input-field { flex: 1; }
 .form-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -263,7 +265,8 @@ select.input-field { cursor: pointer; }
 .sm-note { font-size: 11px; color: var(--text-muted); line-height: 1.55; text-align: center; }
 
 /* 得点者トグル（観戦：現在のスタメンから選択） */
-.ev-scorer-pick { display: flex; flex-direction: column; gap: 6px; }
+.ev-scorer-pick { display: flex; flex-direction: column; gap: 10px; }
+.esp-group { display: flex; flex-direction: column; gap: 6px; }
 .esp-label { font-size: 11px; font-weight: 700; color: var(--text-muted); }
 .esp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .esp-chip { border: 1px solid rgba(255,255,255,0.18); background: var(--card2); color: var(--text); font-size: 12px; font-weight: 600; padding: 6px 11px; border-radius: 16px; cursor: pointer; transition: background 0.12s, border-color 0.12s, color 0.12s; }

@@ -307,7 +307,7 @@ function addEvent() {
   document.getElementById('ev-minute').value = '';
   document.getElementById('ev-player').value = '';
   document.getElementById('ev-player2').value = '';
-  document.getElementById('ev-player').focus();
+  // ＋記録後はあえてフォーカスしない（iPadでキーボードが毎回出るのを防ぐ）
 
   renderLiveScoreboard();
   renderTimeline();
@@ -1388,11 +1388,17 @@ function espChipGroup(label, names, targetId) {
     names.map(n => `<button type="button" class="esp-chip${n === cur ? ' active' : ''}" data-target="${targetId}" data-name="${escHtml(n)}">${escHtml(n)}</button>`).join('') +
     `</div></div>`;
 }
+function setEvInputReadonly(id, ro) { const el = document.getElementById(id); if (el) el.readOnly = ro; }
 function renderScorerPick() {
   const wrap = document.getElementById('ev-scorer-pick');
   if (!wrap) return;
   const m = DB.matches.find(x => x.id === currentMatchId);
-  if (!m || liveType === 'note') { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
+  if (!m || liveType === 'note') {
+    wrap.style.display = 'none'; wrap.innerHTML = '';
+    // メモは「内容」を手入力するので編集可（キーボードOK）
+    setEvInputReadonly('ev-player', false); setEvInputReadonly('ev-player2', false);
+    return;
+  }
   wrap.style.display = '';
   const L = m.lineups && m.lineups[liveSide];
   const onPitch = (L ? Object.values(L.assignments).filter(Boolean) : []).slice().sort(byJerseyNo);
@@ -1402,9 +1408,14 @@ function renderScorerPick() {
     const bench = fmSquadOf(teamName).filter(n => !onPitch.includes(n)).slice().sort(byJerseyNo);
     wrap.innerHTML = espChipGroup(`OUT（退く選手・${sideLabel}）`, onPitch, 'ev-player') +
                      espChipGroup('IN（入る選手・控え）', bench, 'ev-player2');
+    // 候補チップがあればタップ選択（iPadでキーボードを出さない）。無ければ手入力可。
+    setEvInputReadonly('ev-player', onPitch.length > 0);
+    setEvInputReadonly('ev-player2', bench.length > 0);
   } else {
     const label = liveType === 'goal' ? '得点者' : liveType === 'yellow' ? '警告を受けた選手' : liveType === 'red' ? '退場した選手' : '選手';
     wrap.innerHTML = espChipGroup(`${label}（${sideLabel}）`, onPitch, 'ev-player');
+    setEvInputReadonly('ev-player', onPitch.length > 0);
+    setEvInputReadonly('ev-player2', false);
   }
 }
 
@@ -1825,7 +1836,8 @@ document.addEventListener('DOMContentLoaded', () => {
     esp.addEventListener('click', e => {
       const chip = e.target.closest('.esp-chip');
       if (!chip) return;
-      const inp = document.getElementById('ev-player');
+      const inp = document.getElementById(chip.dataset.target || 'ev-player');
+      if (!inp) return;
       inp.value = (inp.value.trim() === chip.dataset.name) ? '' : chip.dataset.name;
       renderScorerPick();
     });
