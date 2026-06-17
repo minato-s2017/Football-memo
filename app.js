@@ -265,6 +265,7 @@ function openLiveScreen(matchId) {
 
   renderStartingMember();
   renderScorerPick();
+  renderMomPick();
   renderLiveScoreboard();
   renderTimeline();
   renderRatingStars();
@@ -313,6 +314,7 @@ function addEvent() {
   renderTimeline();
   renderStartingMember();
   renderScorerPick();
+  renderMomPick();
   refreshDatalists();
 }
 
@@ -326,6 +328,7 @@ function deleteEvent(eid) {
   renderTimeline();
   renderStartingMember();
   renderScorerPick();
+  renderMomPick();
 }
 
 function renderLiveScoreboard() {
@@ -1443,6 +1446,35 @@ function renderScorerPick() {
   }
 }
 
+// MOM（マン・オブ・ザ・マッチ）トグル：両チームの現在のスタメンから1人選ぶ（試合全体・どちらのチームでも可）
+function renderMomPick() {
+  const wrap = document.getElementById('mom-pick');
+  if (!wrap) return;
+  const m = DB.matches.find(x => x.id === currentMatchId);
+  // MOM候補＝その試合で出場した全選手：現在のスタメン ＋ 交代で退いた選手(交代前) ＋ 交代で入った選手(交代後)
+  const candidatesOf = side => {
+    const L = m && m.lineups && m.lineups[side];
+    const set = new Set(L ? Object.values(L.assignments).filter(Boolean) : []);
+    (m ? m.events : []).forEach(e => {
+      if (e.type === 'sub' && e.side === side) {
+        if (e.player)   set.add(e.player);    // 交代で退いた選手（交代前）
+        if (e.playerIn) set.add(e.playerIn);  // 交代で入った選手（交代後）
+      }
+    });
+    return [...set].sort(byJerseyNo);
+  };
+  const home = candidatesOf('home'), away = candidatesOf('away');
+  if (!home.length && !away.length) {
+    wrap.style.display = 'none'; wrap.innerHTML = '';
+    setEvInputReadonly('live-mom', false);   // 候補が無ければ手入力可
+    return;
+  }
+  wrap.style.display = '';
+  wrap.innerHTML = (home.length ? espChipGroup(m.homeTeam || 'チーム1', home, 'live-mom') : '') +
+                   (away.length ? espChipGroup(m.awayTeam || 'チーム2', away, 'live-mom') : '');
+  setEvInputReadonly('live-mom', true);   // 候補があればタップ選択（iPadでキーボードを出さない）
+}
+
 let currentLineupSide = 'home';
 function openLineup(side) {
   const matches = DB.matches;
@@ -1868,6 +1900,19 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!inp) return;
       inp.value = (inp.value.trim() === chip.dataset.name) ? '' : chip.dataset.name;
       renderScorerPick();
+    });
+  }
+
+  // 観戦：MOM トグル（両チームのスタメンから選択・もう一度タップで解除）
+  const momWrap = document.getElementById('mom-pick');
+  if (momWrap) {
+    momWrap.addEventListener('click', e => {
+      const chip = e.target.closest('.esp-chip');
+      if (!chip) return;
+      const inp = document.getElementById('live-mom');
+      inp.value = (inp.value.trim() === chip.dataset.name) ? '' : chip.dataset.name;
+      saveMom(inp.value);
+      renderMomPick();
     });
   }
 
