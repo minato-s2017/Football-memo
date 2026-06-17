@@ -1033,6 +1033,16 @@ function splitPlayer(s) {
   const mm = str.match(/^(\d+)\s+(.+)$/);
   return mm ? { no: mm[1], name: mm[2] } : { no: '', name: str };
 }
+// 名前を1行に収めるフォントサイズ（改行を避ける）。幅 maxW(px) に合わせて 11→7px で縮小。
+let _fmNameMeasure = null;
+function fmFitFont(text, maxW) {
+  if (!_fmNameMeasure) _fmNameMeasure = document.createElement('canvas').getContext('2d');
+  const f = px => `700 ${px}px -apple-system,'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif`;
+  let fs = 11;
+  _fmNameMeasure.font = f(fs);
+  while (_fmNameMeasure.measureText(text).width > maxW && fs > 7) { fs -= 0.5; _fmNameMeasure.font = f(fs); }
+  return fs;
+}
 function renderFormation() {
   const slots = fmCurSlots();
   const isCustom = fmPreset === 'custom';
@@ -1045,7 +1055,7 @@ function renderFormation() {
       return `<div class="fm-slot filled${mv}" data-slot="${i}" style="left:${s.x}%;top:${s.y}%">
                 <button class="fm-slot-x" onclick="event.stopPropagation();fmUnassign(${i})" title="外す">×</button>
                 <div class="fm-slot-dot">${escHtml(sp.no || s.pos)}</div>
-                <div class="fm-slot-name">${escHtml(sp.name)}</div>
+                <div class="fm-slot-name" style="font-size:${fmFitFont(sp.name, 92)}px">${escHtml(sp.name)}</div>
               </div>`;
     }
     return `<div class="fm-slot empty${mv}" data-slot="${i}" style="left:${s.x}%;top:${s.y}%">
