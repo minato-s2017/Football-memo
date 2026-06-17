@@ -1235,7 +1235,7 @@ function saveFormation() {
     if (!m.lineups) m.lineups = {};
     m.lineups[fmMatchCtx.side] = JSON.parse(JSON.stringify({ preset: fmPreset, layout: fmLayout, assignments: fmAssign }));
     DB.saveMatches(matches);
-    showToast('この試合の布陣を保存しました（プリセットは変更なし）');
+    showToast('この試合のフォーメーションを保存しました（プリセットは変更なし）');
     return;
   }
   if (!fmTeam) { showToast('チームを選択してください'); return; }
