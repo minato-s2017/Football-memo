@@ -609,8 +609,11 @@ async function resetAllTeamColors() {
 // ===== 観戦の詳細 =====
 function openMatchDetail(matchId) {
   currentMatchId = matchId;
-  const m = DB.matches.find(x => x.id === matchId);
+  const matches = DB.matches;
+  const m = matches.find(x => x.id === matchId);
   if (!m) return;
+  ensureLineup(m, 'home'); ensureLineup(m, 'away');   // Formationタブのベースをこの試合へ用意（初回のみ）
+  DB.saveMatches(matches);
 
   document.getElementById('detail-name').innerHTML =
     `<span style="color:${teamColor(m.homeTeam)}">${escHtml(m.homeTeam || '?')}</span>` +
@@ -649,6 +652,8 @@ function openMatchDetail(matchId) {
   document.getElementById('resume-btn-placeholder').innerHTML = !m.finished
     ? `<button class="btn btn-primary" onclick="openLiveScreen('${m.id}')">▶ 観戦を再開</button>`
     : `<button class="btn btn-secondary" onclick="openLiveScreen('${m.id}')">✎ 追記・編集</button>`;
+
+  renderSMInto(document.getElementById('detail-sm-canvas-wrap'), m);
 
   showScreen('detail');
 }
@@ -760,14 +765,10 @@ function openStandingsScreen() {
 // ===== 集計（大会・チームで絞り込み） =====
 function openAggScreen() {
   const matches = DB.matches;
-  const comps = [...new Set(matches.map(m => m.competition).filter(Boolean))].sort();
   const teams = [...new Set(matches.flatMap(m => [m.homeTeam, m.awayTeam]).filter(Boolean))].sort();
-  const compSel = document.getElementById('agg-comp');
   const teamSel = document.getElementById('agg-team');
-  const prevComp = compSel.value, prevTeam = teamSel.value;
-  compSel.innerHTML = `<option value="">すべての大会</option>` + comps.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
+  const prevTeam = teamSel.value;
   teamSel.innerHTML = `<option value="">すべてのチーム</option>` + teams.map(t => `<option value="${escHtml(t)}">${escHtml(t)}</option>`).join('');
-  if ([...compSel.options].some(o => o.value === prevComp)) compSel.value = prevComp;
   if ([...teamSel.options].some(o => o.value === prevTeam)) teamSel.value = prevTeam;
   calcAgg();
   showScreen('agg');
@@ -776,10 +777,9 @@ function openAggScreen() {
 const AGG_MEDAL = ['gold', 'silver', 'bronze'];
 
 function calcAgg() {
-  const comp = document.getElementById('agg-comp').value;
+  const comp = 'FIFA WORLD CUP 26';   // 大会は固定（表示用）
   const team = document.getElementById('agg-team').value;
   let matches = DB.matches.slice();
-  if (comp) matches = matches.filter(m => m.competition === comp);
   if (team) matches = matches.filter(m => m.homeTeam === team || m.awayTeam === team);
 
   const result = document.getElementById('agg-result');
@@ -1027,6 +1027,12 @@ function fmSelectTeam() {
   fmPersist(); renderFormation(); renderSavedFormations();
 }
 
+// 「背番号 名前」を分解（背番号は〇内に、名前は全表示）
+function splitPlayer(s) {
+  const str = String(s == null ? '' : s).trim();
+  const mm = str.match(/^(\d+)\s+(.+)$/);
+  return mm ? { no: mm[1], name: mm[2] } : { no: '', name: str };
+}
 function renderFormation() {
   const slots = fmCurSlots();
   const isCustom = fmPreset === 'custom';
@@ -1035,10 +1041,11 @@ function renderFormation() {
     const name = fmAssign[i];
     const mv = isCustom ? ' fm-slot-movable' : '';
     if (name) {
+      const sp = splitPlayer(name);
       return `<div class="fm-slot filled${mv}" data-slot="${i}" style="left:${s.x}%;top:${s.y}%">
                 <button class="fm-slot-x" onclick="event.stopPropagation();fmUnassign(${i})" title="外す">×</button>
-                <div class="fm-slot-dot">${escHtml(s.pos)}</div>
-                <div class="fm-slot-name">${escHtml(name)}</div>
+                <div class="fm-slot-dot">${escHtml(sp.no || s.pos)}</div>
+                <div class="fm-slot-name">${escHtml(sp.name)}</div>
               </div>`;
     }
     return `<div class="fm-slot empty${mv}" data-slot="${i}" style="left:${s.x}%;top:${s.y}%">
@@ -1284,24 +1291,29 @@ function fmRenderCanvas(opts) {
   ctx.font = '15px sans-serif'; ctx.fillStyle = 'rgba(255,255,255,0.75)';
   ctx.fillText(preset === 'custom' ? 'カスタム' : preset, m + 6, m + 38);
   slots.forEach((s, i) => {
-    const cx = s.x/100*W, cy = s.y/100*H, name = assign[i];
+    const cx = s.x/100*W, cy = s.y/100*H, raw = assign[i];
+    const sp = splitPlayer(raw);
     ctx.beginPath(); ctx.arc(cx, cy, 22, 0, Math.PI*2);
-    ctx.fillStyle = name ? '#1f4488' : 'rgba(255,255,255,0.12)'; ctx.fill();
+    ctx.fillStyle = raw ? '#1f4488' : 'rgba(255,255,255,0.12)'; ctx.fill();
     ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(s.pos, cx, cy);
-    if (name) {
-      ctx.font = 'bold 13px sans-serif';
-      const bw = Math.min(ctx.measureText(name).width + 12, 130), bh = 20, by = cy + 26, bx = cx - bw/2, rr = 9;
-      ctx.fillStyle = 'rgba(8,12,28,0.9)';
+    // 〇の中：埋まっていれば背番号（大きめ）、空きはポジション
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const inCircle = raw ? (sp.no || s.pos) : s.pos;
+    ctx.font = `bold ${(raw && sp.no) ? 17 : 11}px sans-serif`;
+    ctx.fillText(inCircle, cx, cy);
+    if (raw) {
+      // 選手名は全表示（…で切らない）。幅に応じてフォントを縮小して必ず収める。
+      let fs = 13;
+      ctx.font = `bold ${fs}px sans-serif`;
+      while (ctx.measureText(sp.name).width > 150 && fs > 8.5) { fs -= 0.5; ctx.font = `bold ${fs}px sans-serif`; }
+      const tw = ctx.measureText(sp.name).width;
+      const bw = tw + 14, bh = 20, by = cy + 26, bx = cx - bw/2, rr = 9;
+      ctx.fillStyle = 'rgba(8,12,28,0.92)';
       ctx.beginPath();
       ctx.moveTo(bx+rr, by); ctx.arcTo(bx+bw, by, bx+bw, by+bh, rr); ctx.arcTo(bx+bw, by+bh, bx, by+bh, rr);
       ctx.arcTo(bx, by+bh, bx, by, rr); ctx.arcTo(bx, by, bx+bw, by, rr); ctx.closePath(); ctx.fill();
       ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle';
-      let disp = name;
-      while (ctx.measureText(disp).width > bw - 12 && disp.length > 1) disp = disp.slice(0, -1);
-      if (disp !== name) disp = disp.replace(/.$/, '…');
-      ctx.fillText(disp, cx, by + bh/2);
+      ctx.fillText(sp.name, cx, by + bh/2);
     }
   });
   return canvas;
@@ -1349,11 +1361,9 @@ function applySub(m, ev) {
 }
 
 // ===== スタメン（観戦画面に2チーム横並びで常時表示：Formationタブのベースを表示。編集はこの試合のみ保存） =====
-function renderStartingMember() {
-  const m = DB.matches.find(x => x.id === currentMatchId);
-  if (!m) return;
-  const wrap = document.getElementById('sm-canvas-wrap');
-  if (!wrap) return;
+// 指定の wrap に2チーム横並びのスタメン盤面を描画（Live・History詳細で共通）
+function renderSMInto(wrap, m) {
+  if (!wrap || !m) return;
   wrap.innerHTML = '';
   ['home', 'away'].forEach(side => {
     const teamName = side === 'home' ? m.homeTeam : m.awayTeam;
@@ -1375,6 +1385,10 @@ function renderStartingMember() {
     col.appendChild(cc);
     wrap.appendChild(col);
   });
+}
+function renderStartingMember() {
+  const m = DB.matches.find(x => x.id === currentMatchId);
+  renderSMInto(document.getElementById('sm-canvas-wrap'), m);
 }
 // この試合だけのスタメン編集（Formation画面を試合モードで開く＝保存先は試合のみ、ベースは不変）
 function editStartingMember(side) { if (currentMatchId) openMatchFormationEdit(currentMatchId, side || 'home'); }
@@ -1453,8 +1467,9 @@ let fmMatchCtx = null;
 function openMatchFormationEdit(matchId, side) {
   const m = DB.matches.find(x => x.id === matchId);
   if (!m) return;
+  const origin = document.querySelector('.screen.active')?.id;   // 'screen-detail' か 'screen-live'
   const L = ensureLineup(m, side);
-  fmMatchCtx = { matchId, side };
+  fmMatchCtx = { matchId, side, origin };
   fmTeam = side === 'home' ? m.homeTeam : m.awayTeam;
   fmPreset = L.preset || DEFAULT_PRESET;
   fmLayout = L.layout || null;
@@ -1485,10 +1500,13 @@ function fmUpdateMatchBanner() {
   }
 }
 function fmBackToMatch() {
-  const mid = fmMatchCtx && fmMatchCtx.matchId;
+  const ctx = fmMatchCtx;
   fmMatchCtx = null;
   fmUpdateMatchBanner();
-  if (mid) openLiveScreen(mid); else initHome();
+  if (ctx && ctx.matchId) {
+    if (ctx.origin === 'screen-detail') openMatchDetail(ctx.matchId);   // 詳細から編集した時は詳細へ戻す
+    else openLiveScreen(ctx.matchId);
+  } else initHome();
 }
 
 // ===== TEAM（グループ→チーム→選手） =====

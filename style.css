@@ -468,13 +468,13 @@ select.input-field { cursor: pointer; }
   display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800;
 }
 .fm-slot.empty .fm-slot-dot { border: 2px dashed rgba(255,255,255,0.5); color: rgba(255,255,255,0.75); background: rgba(255,255,255,0.06); }
-.fm-slot.filled .fm-slot-dot { background: var(--accent); color: var(--white); border: 2px solid var(--white); box-shadow: 0 2px 8px rgba(0,0,0,0.45); }
+.fm-slot.filled .fm-slot-dot { background: var(--accent); color: var(--white); border: 2px solid var(--white); box-shadow: 0 2px 8px rgba(0,0,0,0.45); font-size: 16px; }
 .fm-slot.filled { cursor: grab; }
 .fm-slot.filled:active { cursor: grabbing; }
 .fm-slot-name {
   font-size: 11px; font-weight: 700; color: var(--white);
   background: rgba(8,16,40,0.88); padding: 2px 8px; border-radius: 10px;
-  max-width: 76px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 96px; white-space: normal; overflow-wrap: anywhere; text-align: center; line-height: 1.2;
 }
 .fm-slot-x {
   position: absolute; top: -7px; right: 4px; width: 18px; height: 18px; border-radius: 50%;
